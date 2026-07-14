@@ -467,23 +467,25 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if s["streak_days"]:
             lines.append(_(lang, "stats_streak", streak=s["streak_days"]))
 
-        # Hourly activity bar
+        # Hourly activity bar — compact bars + markers every 3h
         max_count = max(c for _, c in hourly) or 1
         bar_chars = ["⬜", "🟨", "🟧", "🟥", "🟩"]
-        row1 = ""
-        row2 = ""
+        row_bar = ""
+        row_label = ""
         for h, cnt in hourly:
             idx = 0
             if cnt > 0:
                 idx = min(4, max(1, int(cnt / max_count * 4)))
-            row1 += bar_chars[idx]
-            if h > 0:
-                row2 += " "
-            row2 += f"{h:02d}"
+            row_bar += bar_chars[idx]
+            # Show label every 3 hours
+            if h % 3 == 0:
+                row_label += f"{h:02d} "
+            else:
+                row_label += "   "
         lines.append("")
         lines.append(_(lang, "stats_hourly"))
-        lines.append(row1)
-        lines.append(row2)
+        lines.append(row_bar)
+        lines.append(row_label.rstrip())
 
         await query.edit_message_text(
             "\n".join(lines),
@@ -835,6 +837,10 @@ def make_status_handler(bot_app):
 
         tracked_ids = {u["user_id"] for u in db.get_active_users()}
         if user_id not in tracked_ids:
+            return
+
+        user = db.get_user(user_id)
+        if not user:
             return
 
         now_utc = datetime.now(timezone.utc)
