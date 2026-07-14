@@ -31,43 +31,43 @@ def h2(title: str):
 # ==================== 1. IMPORTS & DB ====================
 h1("1. Imports & DB")
 from db.core import (init_db, add_user, remove_user, get_active_users, get_user,
-                     set_display_name, get_display_name,
-                     set_notify_mode, get_notify_mode,
-                     set_mute, is_muted, get_prev_session, get_export_data,
-                     start_session, end_session, get_daily_log, get_last_seen, is_online_now)
+                     get_notify_mode, set_notify_mode,
+                     mute_user, unmute_user, is_muted, get_export_data,
+                     start_session, end_session, get_daily_log, get_last_seen, is_online_now,
+                     rename_user, get_user_stats, get_hourly_activity, get_overall_stats,
+                     get_db_stats, cleanup_old_sessions, vacuum_db)
 from db import settings
+OWNER_ID = int(os.getenv("OWNER_ID", "84295013"))
 init_db()
 test("init_db() no errors", True)
 
 # ==================== 2. DISPLAY NAMES ====================
 h1("2. Display Names")
 TEST_ID = 99999
-add_user(TEST_ID, "testuser", "Test")
+add_user(TEST_ID, "testuser", "Test", OWNER_ID)
 test("add_user", get_user(TEST_ID) is not None)
-test("get_display_name (None by default)", get_display_name(TEST_ID) is None)
-set_display_name(TEST_ID, "Bob ❤️")
-test("set_display_name", get_display_name(TEST_ID) == "Bob ❤️")
-set_display_name(TEST_ID, None)
-test("clear display_name", get_display_name(TEST_ID) is None)
+test("display_name (None by default)", get_user(TEST_ID)["display_name"] is None)
+rename_user(TEST_ID, "Bob ❤️", OWNER_ID)
+test("rename_user", get_user(TEST_ID)["display_name"] == "Bob ❤️")
+rename_user(TEST_ID, "", OWNER_ID)  # clear
+test("clear display_name", not get_user(TEST_ID)["display_name"])
 
 # ==================== 3. NOTIFY MODES ====================
 h1("3. Notify Modes")
 for mode in ["online", "offline", "both", "none"]:
-    set_notify_mode(TEST_ID, mode)
-    test(f"set/get_notify_mode('{mode}')", get_notify_mode(TEST_ID) == mode)
+    set_notify_mode(TEST_ID, mode, OWNER_ID)
+    test(f"set/get_notify_mode('{mode}')", get_notify_mode(TEST_ID, OWNER_ID) == mode)
 
 # ==================== 4. MUTE ====================
 h1("4. Mute")
 from datetime import datetime, timezone, timedelta
-test("not muted by default", not is_muted(TEST_ID))
-future = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
-set_mute(TEST_ID, future)
-test("is_muted after set", is_muted(TEST_ID))
-past = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
-set_mute(TEST_ID, past)
-test("not muted after expiry", not is_muted(TEST_ID))
-set_mute(TEST_ID, None)
-test("unmute works", not is_muted(TEST_ID))
+test("not muted by default", not is_muted(TEST_ID, OWNER_ID))
+mute_user(TEST_ID, 1, OWNER_ID)
+test("is_muted after mute", is_muted(TEST_ID, OWNER_ID))
+mute_user(TEST_ID, 0, OWNER_ID)  # expired immediately
+test("not muted after expiry", not is_muted(TEST_ID, OWNER_ID))
+unmute_user(TEST_ID, OWNER_ID)
+test("unmute works", not is_muted(TEST_ID, OWNER_ID))
 
 # ==================== 5. CALLBACK PATTERNS ====================
 h1("5. Callback Patterns")
@@ -187,32 +187,31 @@ for lang in ["en", "ru"]:
 
 # ==================== 8. LOG FLOW SIMULATION ====================
 h1("8. Log Flow Simulation")
-users = get_active_users()
+users = get_active_users(OWNER_ID)
 if users:
     uid = users[0]["user_id"]
     # Test get_daily_log
     today = datetime.utcnow().strftime("%Y-%m-%d")
-    sessions = get_daily_log(uid, today)
+    sessions = get_daily_log(uid, today, tracked_by=OWNER_ID)
     test(f"get_daily_log({uid}, today) returns {len(sessions)} sessions", True)
     # Test get_last_seen
-    ls = get_last_seen(uid)
+    ls = get_last_seen(uid, OWNER_ID)
     test(f"get_last_seen({uid}) returns value", ls is not None or True, str(ls))
     # Test is_online_now
-    on = is_online_now(uid)
+    on = is_online_now(uid, OWNER_ID)
     test(f"is_online_now({uid}) returns bool", isinstance(on, bool))
 
-# ==================== 9. CSV EXPORT ====================
+data = get_export_data(users[0]["user_id"], days=365, tracked_by=OWNER_ID) if users else []
 h1("9. CSV Export")
-data = get_export_data(users[0]["user_id"], days=365) if users else []
 test(f"get_export_data returns {len(data)} rows", len(data) >= 0)
 if data:
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["username", "display_name", "went_online", "went_offline"])
+    w.writerow(["user_id", "went_online", "went_offline"])
     for row in data:
-        w.writerow([row["username"], row["display_name"], row["went_online"], row["went_offline"]])
+        w.writerow([row["user_id"], row["went_online"], row["went_offline"]])
     buf.seek(0)
-    test("CSV has header", buf.readline().startswith("username"))
+    test("CSV has header", buf.readline().startswith("user_id"))
     test("CSV has data rows", len(buf.readlines()) > 0)
 
 # ==================== 10. SERVICE HEALTH ====================
@@ -228,7 +227,7 @@ else:
     test("no errors in service log (grep found 0)", True)
 
 # ==================== CLEANUP ====================
-remove_user(TEST_ID)
+remove_user(TEST_ID, OWNER_ID)
 
 # ==================== SUMMARY ====================
 h1("SUMMARY")

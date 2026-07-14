@@ -94,8 +94,8 @@ def main_menu(lang: str):
     ])
 
 
-def contacts_list(lang: str):
-    users = db.get_active_users()
+def contacts_list(lang: str, tracked_by: int):
+    users = db.get_active_users(tracked_by)
     if not users:
         return None, _(lang, "no_contacts")
     buttons = []
@@ -108,8 +108,8 @@ def contacts_list(lang: str):
     return InlineKeyboardMarkup(buttons), _(lang, "contacts_title") + f" ({len(users)}):"
 
 
-def user_picker(lang: str, prefix: str):
-    users = db.get_active_users()
+def user_picker(lang: str, prefix: str, tracked_by: int):
+    users = db.get_active_users(tracked_by)
     if not users:
         return None, _(lang, "no_contacts")
     buttons = []
@@ -170,7 +170,7 @@ def whitelist_menu(lang: str):
 
 def display(user_id: int) -> str:
     """Resolve best display name: custom > username > user_id."""
-    user = db.get_user(user_id)
+    user = db.get_user(user_id, tracked_by)
     if not user:
         return str(user_id)
     return user["display_name"] or user["username"] or str(user_id)
@@ -194,13 +194,13 @@ def fmt_last_seen(lang: str, username: str, ts: str | None) -> str:
     return _(lang, "last_seen_just_now", username=username)
 
 
-def fmt_daily_log_for_user(lang: str, user_id: int, username: str, date_str: str, page: int = 0) -> tuple[str, int]:
+def fmt_daily_log_for_user(lang: str, user_id: int, username: str, date_str: str, page: int = 0, tracked_by: int | None = None) -> tuple[str, int]:
     """Return (text, total_pages) for paginated daily log.
     page 0 = first 5 sessions, page 1 = next 5, etc.
     Sessions count is 5 per page. Returns total_pages = ceil(total / 5).
     """
     PAGE_SIZE = 5
-    sessions = db.get_daily_log(user_id, date_str)
+    sessions = db.get_daily_log(user_id, date_str, tracked_by=tracked_by)
     total = len(sessions)
     total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
     start = page * PAGE_SIZE
@@ -224,8 +224,8 @@ def fmt_daily_log_for_user(lang: str, user_id: int, username: str, date_str: str
     return "\n".join(lines), total_pages
 
 
-def fmt_getall(lang: str) -> str:
-    users = db.get_active_users()
+def fmt_getall(lang: str, tracked_by: int) -> str:
+    users = db.get_active_users(tracked_by)
     if not users:
         return _(lang, "no_contacts")
     lines = [_(lang, "getall_title")]
@@ -250,17 +250,17 @@ def fmt_getall(lang: str) -> str:
     return "\n".join(lines)
 
 
-def user_menu_view(lang: str, user_id: int) -> tuple[InlineKeyboardMarkup, str]:
+def user_menu_view(lang: str, user_id: int, tracked_by: int) -> tuple[InlineKeyboardMarkup, str]:
     """Build the per-user action submenu."""
-    user = db.get_user(user_id)
+    user = db.get_user(user_id, tracked_by)
     if not user:
         return InlineKeyboardMarkup([
             [InlineKeyboardButton(_(lang, "back"), callback_data="contacts")]
         ]), "User not found."
     name = display(user_id)
-    mode = db.get_notify_mode(user_id)
+    mode = db.get_notify_mode(user_id, tracked_by)
     mode_name = _(lang, f"notify_{mode}")
-    muted = db.is_muted(user_id)
+    muted = db.is_muted(user_id, tracked_by)
     text = _(lang, "user_menu_title", username=name)
     kb = [
         [InlineKeyboardButton(_(lang, "btn_user_log"), callback_data=f"log_{user_id}")],
@@ -283,10 +283,10 @@ def user_menu_view(lang: str, user_id: int) -> tuple[InlineKeyboardMarkup, str]:
     return InlineKeyboardMarkup(kb), text
 
 
-async def send_csv(update: Update, user_id: int, days: int = 365):
+async def send_csv(update: Update, user_id: int, days: int = 365, tracked_by: int | None = None):
     """Generate CSV and send as document."""
     import csv, io
-    data = db.get_export_data(user_id, days)
+    data = db.get_export_data(user_id, days, tracked_by)
     if not data:
         await update.effective_message.reply_text("No data to export.")
         return
@@ -333,6 +333,7 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not lang:
         await reject(update)
         return
+    current_uid = update.effective_user.id
     await query.answer()
     data = query.data
 
@@ -341,18 +342,18 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(_(lang, "menu_title"), reply_markup=main_menu(lang))
 
     elif data == "contacts":
-        kb, text = contacts_list(lang)
+        kb, text = contacts_list(lang, current_uid)
         await query.edit_message_text(text, reply_markup=kb)
 
     # ── Last seen ──
     elif data == "lastseen":
-        kb, text = user_picker(lang, "ls")
+        kb, text = user_picker(lang, "ls", current_uid)
         await query.edit_message_text(text, reply_markup=kb)
 
     elif data.startswith("ls_"):
         user_id = int(data.split("_")[1])
         name = display(user_id)
-        ts = db.get_last_seen(user_id)
+        ts = db.get_last_seen(user_id, current_uid)
         await query.edit_message_text(
             fmt_last_seen(lang, name, ts),
             reply_markup=InlineKeyboardMarkup([
@@ -362,7 +363,7 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Full log ──
     elif data == "fulllog":
-        kb, text = user_picker(lang, "log")
+        kb, text = user_picker(lang, "log", current_uid)
         await query.edit_message_text(text, reply_markup=kb)
 
     elif data.startswith("log_"):
@@ -373,7 +374,7 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             date_str = parts[2]
             page = int(parts[3]) if len(parts) >= 4 else 0
             name = display(user_id)
-            text, total_pages = fmt_daily_log_for_user(lang, user_id, name, date_str, page)
+            text, total_pages = fmt_daily_log_for_user(lang, user_id, name, date_str, page, current_uid)
             btns = [[InlineKeyboardButton(_(lang, "back"), callback_data=f"log_{user_id}")]]
             if page + 1 < total_pages:
                 btns.insert(0, [InlineKeyboardButton(
@@ -393,7 +394,7 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parts = data.split("_")
         user_id, date_str = int(parts[1]), parts[2]
         name = display(user_id)
-        text, total_pages = fmt_daily_log_for_user(lang, user_id, name, date_str, 0)
+        text, total_pages = fmt_daily_log_for_user(lang, user_id, name, date_str, 0, current_uid)
         btns = [[InlineKeyboardButton(_(lang, "back"), callback_data=f"log_{user_id}")]]
         if total_pages > 1:
             btns.insert(0, [InlineKeyboardButton(
@@ -415,7 +416,7 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ── Getall ──
     elif data == "getall":
         await query.edit_message_text(
-            fmt_getall(lang),
+            fmt_getall(lang, current_uid),
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton(_(lang, "back"), callback_data="menu")]
             ]),
@@ -423,7 +424,7 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── v5: Stats ──────────────────────────────────────────────────
     elif data == "stats":
-        s = db.get_overall_stats()
+        s = db.get_overall_stats(current_uid)
         if not s["total_sessions"]:
             await query.answer(_(lang, "stats_no_data"), show_alert=True)
             return
@@ -438,7 +439,7 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for u in s["users"]:
             lines.append(_(lang, "stats_user_row", name=u["name"], sessions=u["sessions"], hours=u["total_h"]))
 
-        users = db.get_active_users()
+        users = db.get_active_users(tracked_by)
         btns = []
         for u in users:
             name = u["display_name"] or u["username"] or str(u["user_id"])
@@ -450,8 +451,8 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("ustats_"):
         user_id = int(data.split("_")[1])
         name = display(user_id)
-        s = db.get_user_stats(user_id)
-        hourly = db.get_hourly_activity(user_id, 7)
+        s = db.get_user_stats(user_id, current_uid)
+        hourly = db.get_hourly_activity(user_id, 7, current_uid)
 
         if not s["sessions"]:
             await query.answer(_(lang, "stats_no_data"), show_alert=True)
@@ -566,7 +567,7 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── v4: DB stats + restart ───────────────────────────────────
     elif data == "db_stats":
-        s = db.get_db_stats()
+        s = db.get_db_stats(current_uid)
         text = _(lang, "db_stats", size=s["size_mb"], sessions=s["sessions"], users=s["users"])
         await query.edit_message_text(
             text,
@@ -583,7 +584,7 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer(_(lang, "cleanup_done", count=deleted), show_alert=True)
         else:
             await query.answer(_(lang, "cleanup_none"), show_alert=True)
-        s = db.get_db_stats()
+        s = db.get_db_stats(current_uid)
         text = _(lang, "db_stats", size=s["size_mb"], sessions=s["sessions"], users=s["users"])
         await query.edit_message_text(
             text,
@@ -611,7 +612,7 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ── v3: User submenu ──────────────────────────────────────────
     elif data.startswith("user_"):
         user_id = int(data.split("_")[1])
-        kb, text = user_menu_view(lang, user_id)
+        kb, text = user_menu_view(lang, user_id, current_uid)
         await query.edit_message_text(text, reply_markup=kb)
 
     elif data.startswith("notifymode_"):
@@ -620,7 +621,7 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         cur = db.get_notify_mode(user_id)
         nxt = modes[(modes.index(cur) + 1) % len(modes)]
         db.set_notify_mode(user_id, nxt)
-        kb, text = user_menu_view(lang, user_id)
+        kb, text = user_menu_view(lang, user_id, current_uid)
         await query.edit_message_text(text, reply_markup=kb)
 
     elif data.startswith("rename_"):
@@ -642,7 +643,7 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.set_mute(user_id, until)
         name = display(user_id)
         await query.answer(_(lang, "mute_done", username=name, hours=hours), show_alert=True)
-        kb, text = user_menu_view(lang, user_id)
+        kb, text = user_menu_view(lang, user_id, current_uid)
         await query.edit_message_text(text, reply_markup=kb)
 
     elif data.startswith("unmute_"):
@@ -650,12 +651,12 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.set_mute(user_id, None)
         name = display(user_id)
         await query.answer(_(lang, "unmute_done", username=name), show_alert=True)
-        kb, text = user_menu_view(lang, user_id)
+        kb, text = user_menu_view(lang, user_id, current_uid)
         await query.edit_message_text(text, reply_markup=kb)
 
     elif data.startswith("export_"):
         user_id = int(data.split("_")[1])
-        await send_csv(update, user_id)
+        await send_csv(update, user_id, tracked_by=current_uid)
 
     elif data.startswith("remove_"):
         user_id = int(data.split("_")[1])
@@ -663,9 +664,9 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("👑 Cannot remove the owner", show_alert=True)
             return
         name = display(user_id)
-        db.remove_user(user_id)
+        db.remove_user(user_id, current_uid)
         await query.answer(_(lang, "remove_success", name=name), show_alert=True)
-        kb, text = contacts_list(lang)
+        kb, text = contacts_list(lang, current_uid)
         if not kb:
             await query.edit_message_text(text, reply_markup=main_menu(lang))
         else:
@@ -809,7 +810,7 @@ async def receive_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = context.user_data.get("datepick_for")
     if user_id:
         name = display(user_id)
-        text, total_pages = fmt_daily_log_for_user(lang, user_id, name, date_str, 0)
+        text, total_pages = fmt_daily_log_for_user(lang, user_id, name, date_str, 0, current_uid)
         btns = [[InlineKeyboardButton(_(lang, "back"), callback_data=f"log_{user_id}")]]
         if total_pages > 1:
             btns.insert(0, [InlineKeyboardButton(
@@ -839,7 +840,7 @@ def make_status_handler(bot_app):
         user_id = event.user_id
         status = event.status
 
-        tracked_ids = {u["user_id"] for u in db.get_active_users()}
+        tracked_ids = {u["user_id"] for u in db.get_active_users(tracked_by)}
         if user_id not in tracked_ids:
             return
 
@@ -853,7 +854,7 @@ def make_status_handler(bot_app):
             db.start_session(user_id)
             print(f"[{now_utc}] 🟢 user_id={user_id} → online")
 
-            mode = db.get_notify_mode(user_id)
+            mode = db.get_notify_mode(user_id, tracked_by)
             if mode in ("online", "both") and not db.is_muted(user_id):
                 # Context: how long were they offline?
                 prev = db.get_prev_session(user_id)
@@ -874,10 +875,11 @@ def make_status_handler(bot_app):
                     pass
 
         elif isinstance(status, UserStatusOffline):
-            db.end_session(user_id)
+            for tu in tracking_users:
+                db.end_session(user_id, tu)
             print(f"[{now_utc}] ⚫ user_id={user_id} → offline")
 
-            mode = db.get_notify_mode(user_id)
+            mode = db.get_notify_mode(user_id, tracked_by)
             if mode in ("offline", "both") and not db.is_muted(user_id):
                 # Context: how long was the session?
                 prev = db.get_prev_session(user_id)
