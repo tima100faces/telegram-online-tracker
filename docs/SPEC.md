@@ -63,10 +63,11 @@ Track exact Telegram online/offline timestamps for specified users. Multi-user b
 - [x] Child accounts: language + notification toggle only
 
 ### Planned (v7+)
-- [ ] Owner super-admin panel: view all users, manage access
-- [ ] Per-user notification preferences (not global)
-- [ ] Web dashboard for stats
-- [ ] Daily summary (configurable time)
+
+- [ ] **Daily summary** — scheduled report: "X was online 3.2h today, Y — 1.5h", configurable delivery time
+- [ ] **Owner super-admin panel** — view all users, their contacts, manage whitelist from bot UI
+- [ ] **Per-user preferences** — language and notification toggle per bot user (currently global)
+- [ ] **Web dashboard** — browser-based stats view, not in Telegram
 
 ## Technical Constraints
 
