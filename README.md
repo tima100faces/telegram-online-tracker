@@ -141,6 +141,19 @@ telegram-online-tracker/
 
 ## FAQ
 
+### How do I find my Telegram user ID?
+
+You need this for the `OWNER_ID` in `.env`. It's a number, not your @username.
+
+**The easiest way** (takes 10 seconds):
+1. Open Telegram → search for **@userinfobot**
+2. Click **Start** (or send `/start`)
+3. It replies with your ID. Copy the number after `Id:`
+
+That's it. Paste that number as `OWNER_ID` in your `.env` file.
+
+> 💡 To whitelist other users or add them to tracking — the bot resolves @usernames automatically. You just type `@their_name`.
+
 ### Is this against Telegram's ToS?
 
 No. This bot listens to the same `UpdateUserStatus` events any official client receives. It's indistinguishable from a normal user having Telegram open. Section 1.4 of the ToS prohibits "automated data collection" via scraping/parsing — we're not scraping anything, we're a legitimate MTProto client.
