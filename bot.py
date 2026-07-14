@@ -54,7 +54,7 @@ def guard(update: Update) -> str | None:
     # Open beta: auto-whitelist new users
     if settings.is_open_mode():
         uname = update.effective_user.username or ""
-        settings.add_whitelist(uid, uname, 0)
+        settings.add_to_whitelist(uid, uname, 0)
         return settings.get_lang()
     return None
 
