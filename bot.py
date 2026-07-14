@@ -1068,7 +1068,7 @@ async def main():
 
     default_pattern = (
         "^(menu|contacts|lastseen|fulllog|getall|settings"
-        "|toggle_lang|toggle_notifications|whitelist_menu|noop"
+        "|toggle_lang|toggle_notifications|toggle_open_mode|whitelist_menu|noop"
         "|access_log|clearlog"
         "|db_stats|cleanup_db|restart_confirm|do_restart"
         "|stats|ustats_\\d+"
