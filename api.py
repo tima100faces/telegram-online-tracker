@@ -26,7 +26,14 @@ from urllib.parse import urlparse
 # ── Config ─────────────────────────────────────────────────────────
 HOST = os.getenv("API_HOST", "127.0.0.1")
 PORT = int(os.getenv("API_PORT", "8091"))
-TOKEN = os.getenv("API_TOKEN") or os.getenv("BOT_TOKEN") or "changeme"
+TOKEN = os.getenv("API_TOKEN")
+if not TOKEN:
+    print("[api] WARNING: API_TOKEN is not set, all authenticated endpoints will return 401")
+    TOKEN = ""
+
+def check_auth(handler) -> bool:
+    header = handler.headers.get("Authorization", "")
+    return header == f"Bearer {TOKEN}" and TOKEN != ""
 
 
 # ── Helpers ────────────────────────────────────────────────────────
@@ -40,19 +47,8 @@ def load_db():
 def json_response(handler, data, status=200):
     handler.send_response(status)
     handler.send_header("Content-Type", "application/json; charset=utf-8")
-    handler.send_header("Access-Control-Allow-Origin", "*")
     handler.end_headers()
     handler.wfile.write(json.dumps(data, ensure_ascii=False, default=str).encode())
-
-
-def check_auth(handler) -> bool:
-    header = handler.headers.get("Authorization", "")
-    if f"Bearer {TOKEN}" in header:
-        return True
-    # Also accept ?token=XXX in URL
-    from urllib.parse import parse_qs, urlparse
-    params = parse_qs(urlparse(handler.path).query)
-    return params.get("token", [None])[0] == TOKEN
 
 
 # ── Handlers ───────────────────────────────────────────────────────
