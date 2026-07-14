@@ -14,7 +14,7 @@ from telethon import TelegramClient, events
 from telethon.tl.types import UserStatusOnline, UserStatusOffline
 from telethon.errors import FloodWaitError
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler,
     MessageHandler, ConversationHandler, filters, ContextTypes,
@@ -330,6 +330,62 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(_(lang, "open_beta_onboarding"))
     await update.message.reply_text(_(lang, "menu_title"), reply_markup=main_menu(lang))
 
+
+# ── Text command handlers (for persistent command menu) ────────────────
+
+
+async def cmd_add(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """➕ Add contact — trigger the add conversation."""
+    lang = guard(update)
+    if not lang:
+        await reject(update)
+        return
+    await update.message.reply_text(_(lang, "add_prompt"))
+    return WAIT_USERNAME
+
+
+async def cmd_getall(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """📋 Show all tracked contacts."""
+    lang = guard(update)
+    if not lang:
+        await reject(update)
+        return
+    current_uid = update.effective_user.id
+    await update.message.reply_text(fmt_getall(lang, current_uid))
+
+
+async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """📊 Show statistics."""
+    lang = guard(update)
+    if not lang:
+        await reject(update)
+        return
+    current_uid = update.effective_user.id
+    s = db.get_overall_stats(current_uid)
+    if not s["total_sessions"]:
+        await update.message.reply_text(_(lang, "stats_no_data"))
+        return
+    lines = [
+        _(lang, "stats_title"), "",
+        _(lang, "stats_overall", sessions=s["total_sessions"], hours=s["total_h"]), "",
+        _(lang, "stats_top"),
+    ]
+    for u in s["users"]:
+        lines.append(_(lang, "stats_user_row", name=u["name"], sessions=u["sessions"], hours=u["total_h"]))
+    await update.message.reply_text("\n".join(lines))
+
+
+async def cmd_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """⚙️ Show settings."""
+    await start(update, context)
+
+
+async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """❓ Help — show main menu and info."""
+    await start(update, context)
+
+
+# ── Callback handler ──────────────────────────────────────────────────
 
 async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -976,12 +1032,26 @@ async def main():
     app = Application.builder().token(BOT_TOKEN).build()
     app.bot_data["telethon_client"] = telethon
 
+    # Register persistent commands (visible after clearing chat history)
+    await app.bot.set_my_commands([
+        BotCommand("start", "📡 Main menu"),
+        BotCommand("add", "➕ Add contact"),
+        BotCommand("getall", "📋 All contacts"),
+        BotCommand("stats", "📊 Statistics"),
+        BotCommand("settings", "⚙️ Settings"),
+        BotCommand("help", "❓ Help"),
+    ])
+
     telethon.add_event_handler(make_status_handler(app), events.UserUpdate)
     print("[main] Telethon connected, listening...")
 
     # Conversation handlers
+    # Add /add as a text command entry point for the add conversation
     add_conv = ConversationHandler(
-        entry_points=[CallbackQueryHandler(menu_callback, pattern="^add$")],
+        entry_points=[
+            CallbackQueryHandler(menu_callback, pattern="^add$"),
+            CommandHandler("add", cmd_add),
+        ],
         states={WAIT_USERNAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_username)]},
         fallbacks=[CallbackQueryHandler(menu_callback, pattern="^menu$")],
     )
@@ -1013,6 +1083,10 @@ async def main():
     )
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("getall", cmd_getall))
+    app.add_handler(CommandHandler("stats", cmd_stats))
+    app.add_handler(CommandHandler("settings", cmd_settings))
+    app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CallbackQueryHandler(menu_callback, pattern=default_pattern))
     app.add_handler(add_conv)
     app.add_handler(wl_conv)
