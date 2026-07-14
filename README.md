@@ -90,7 +90,7 @@ cd telegram-online-tracker
 pip install -r requirements.txt
 ```
 
-Create a `.env` file:
+Create a `.env` file (copy from `.env.example` and fill in your real values):
 
 ```env
 BOT_TOKEN=123456:ABCdef...
