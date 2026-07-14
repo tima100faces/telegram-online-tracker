@@ -108,22 +108,78 @@ test("date_conv matches 'datepick_123'", bool(conv_patterns["date_conv"].match("
 test("date_conv NOT match 'date_123_2026'", not bool(conv_patterns["date_conv"].match("date_123_2026")))
 test("rename_conv matches 'rename_99999'", bool(conv_patterns["rename_conv"].match("rename_99999")))
 
-# ==================== 7. i18n (ALL V3 KEYS) ====================
+# ==================== 7. i18n Keys ====================
 h1("7. i18n Keys")
 from i18n import get_text as _, TEXTS
-v3_keys = [
-    "user_menu_title", "btn_user_log", "btn_user_rename", "btn_user_lastseen",
-    "btn_user_notify", "btn_user_mute", "btn_user_export", "btn_user_remove",
-    "notify_online", "notify_offline", "notify_both", "notify_none",
-    "rename_prompt", "rename_done", "rename_cleared",
-    "back_to_user", "mute_1h", "mute_4h", "mute_24h", "mute_done", "unmute_done",
-    "btn_more", "log_page_indicator", "export_sent", "export_empty", "db_stats_title", "db_stats", "btn_cleanup",
- "cleanup_done", "cleanup_none", "btn_restart", "restart_confirm", "restarting",
- ]
+
+# Get all defined keys
+en_keys = set(TEXTS["en"].keys())
+ru_keys = set(TEXTS["ru"].keys())
+
+# 7a — equal count
+test(f"EN and RU have same count ({len(en_keys)} vs {len(ru_keys)})",
+     len(en_keys) == len(ru_keys),
+     f"EN={len(en_keys)}, RU={len(ru_keys)}")
+
+# 7b — no orphan keys
+only_en = en_keys - ru_keys
+only_ru = ru_keys - en_keys
+test("no EN-only keys", not only_en, str(only_en))
+test("no RU-only keys", not only_ru, str(only_ru))
+
+# 7c — every key returns non-placeholder value
 for lang in ["en", "ru"]:
-    for key in v3_keys:
+    for key in en_keys | ru_keys:
         val = _(lang, key)
-        test(f"{lang}.{key} exists", val and val != key, f"got: {val}")
+        test(f"{lang}.{key} → non-empty", val and val != key, f"got: '{val}'")
+    # 7d — all format keys work
+    format_tests = {
+        "settings_language": {"lang_name": "XX"},
+        "notify_online": {},
+        "notify_offline": {},
+        "notify_both": {},
+        "notify_none": {},
+        "user_menu_title": {"username": "test"},
+        "btn_user_notify": {"mode": "test"},
+        "db_stats": {"size": 0.1, "sessions": 10, "users": 2},
+        "cleanup_done": {"count": 5},
+        "mute_done": {"username": "test", "hours": 1},
+        "unmute_done": {"username": "test"},
+        "rename_prompt": {"username": "test"},
+        "rename_done": {"username": "test", "name": "Test"},
+        "rename_cleared": {"username": "test"},
+        "log_page_indicator": {"page": 1, "total": 3, "sessions": "15"},
+        "last_seen_hours": {"username": "test", "n": 5, "time": "15:30"},
+        "last_seen_minutes": {"username": "test", "n": 30},
+        "last_seen_days": {"username": "test", "n": 3, "date": "11.07 14:00"},
+        "last_seen_months": {"username": "test", "n": 2, "date": "01.05.2026"},
+        "last_seen_years": {"username": "test", "n": 1, "date": "01.01.2025"},
+        "last_seen_just_now": {"username": "test"},
+        "last_seen_online": {"username": "test"},
+        "no_log": {"username": "test", "date": "2026-07-14"},
+        "daily_log_title": {"username": "test", "date": "2026-07-14"},
+        "daily_log_entry": {"on": "06:00", "off": "06:30"},
+        "daily_log_online": {"on": "06:00"},
+        "notif_online_ctx": {"name": "test", "offline_dur": "3h 12m"},
+        "notif_offline_ctx": {"name": "test", "session_dur": "47 min"},
+        "notification_online": {"username": "test"},
+        "notification_offline": {"username": "test", "time": "15:30"},
+        "add_success": {"username": "test"},
+        "remove_success": {"name": "test"},
+        "getall_online": {"username": "test"},
+        "getall_offline": {"username": "test", "when": "3h ago"},
+        "btn_access_log": {"total": 5},
+        "access_log_title": {"total": 10, "blocked": 2},
+        "access_log_entry": {"username": "test", "count": 3, "last": "2026-07-14"},
+        "access_log_entry_blocked": {"username": "test", "count": 5, "last": "2026-07-14"},
+        "btn_clear_log": {},
+        "cleared_log": {},
+        "btn_whitelist": {},
+    }
+    for key, kwargs in format_tests.items():
+        val = _(lang, key, **kwargs)
+        has_placeholder = "{" in val and val != key
+        test(f"{lang}.{key}(...) → formatted", not has_placeholder, f"unresolved: '{val}'")
 
 # ==================== 8. LOG FLOW SIMULATION ====================
 h1("8. Log Flow Simulation")

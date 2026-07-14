@@ -172,6 +172,8 @@ They get one of 13 randomly-selected rude English phrases (stuff like "Private p
 
 ---
 
+See [CHANGELOG.md](CHANGELOG.md) for version history.
+
 ## License
 
 [GNU General Public License v3.0](LICENSE) — free software, copyleft. Use it, modify it, share it — just keep it open.
