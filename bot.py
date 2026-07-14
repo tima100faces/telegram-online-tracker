@@ -277,7 +277,8 @@ def user_menu_view(lang: str, user_id: int) -> tuple[InlineKeyboardMarkup, str]:
             InlineKeyboardButton(_(lang, "mute_24h"), callback_data=f"mute_{user_id}_24"),
         ])
     kb.append([InlineKeyboardButton(_(lang, "btn_user_export"), callback_data=f"export_{user_id}")])
-    kb.append([InlineKeyboardButton(_(lang, "btn_user_remove"), callback_data=f"remove_{user_id}")])
+    if user_id != OWNER_ID:
+        kb.append([InlineKeyboardButton(_(lang, "btn_user_remove"), callback_data=f"remove_{user_id}")])
     kb.append([InlineKeyboardButton(_(lang, "back"), callback_data="contacts")])
     return InlineKeyboardMarkup(kb), text
 
@@ -658,6 +659,9 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data.startswith("remove_"):
         user_id = int(data.split("_")[1])
+        if user_id == OWNER_ID:
+            await query.answer("👑 Cannot remove the owner", show_alert=True)
+            return
         name = display(user_id)
         db.remove_user(user_id)
         await query.answer(_(lang, "remove_success", name=name), show_alert=True)
