@@ -2,7 +2,7 @@
 """Lightweight REST API for Telegram Online Tracker.
 
 Zero dependencies — pure Python stdlib http.server.
-Auth via API_TOKEN in .env or BOT_TOKEN as fallback.
+Auth via API_TOKEN in .env. If unset, all authenticated endpoints return 401.
 Binds to localhost only.
 
 Endpoints:
