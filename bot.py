@@ -169,6 +169,7 @@ def whitelist_menu(lang: str):
 
 def display(user_id: int) -> str:
     """Resolve best display name: custom > username > user_id."""
+    user = db.get_user(user_id)
     if not user:
         return str(user_id)
     return user["display_name"] or user["username"] or str(user_id)
