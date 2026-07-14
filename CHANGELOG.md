@@ -22,6 +22,9 @@ All notable changes to Telegram Online Tracker.
 - `display()` NameError — missing `db.get_user()` call (broke all log flows)
 - Settings buttons lost dynamic counts (whitelist size, notification state)
 - Hourly chart label alignment: markers every 3h instead of cluttered all-24
+- **Owner could be removed from contacts** — `remove_` handler lacked OWNER_ID guard
+- **Undefined `user` variable** in `make_status_handler` — NameError on notification send
+- **OWNER_ID missing from `.env`** — defaulted to placeholder `123456789`, owner lost access
 
 ## [v4] — 2026-07-14
 
