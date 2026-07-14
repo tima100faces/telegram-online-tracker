@@ -618,9 +618,9 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("notifymode_"):
         user_id = int(data.split("_")[1])
         modes = ["online", "offline", "both", "none"]
-        cur = db.get_notify_mode(user_id)
+        cur = db.get_notify_mode(user_id, current_uid)
         nxt = modes[(modes.index(cur) + 1) % len(modes)]
-        db.set_notify_mode(user_id, nxt)
+        db.set_notify_mode(user_id, nxt, current_uid)
         kb, text = user_menu_view(lang, user_id, current_uid)
         await query.edit_message_text(text, reply_markup=kb)
 
@@ -731,7 +731,7 @@ async def receive_username(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     first = getattr(entity, "first_name", "") or ""
-    db.add_user(entity.id, username, first)
+    db.add_user(entity.id, username, first, tracked_by=update.effective_user.id)
     settings.unblock_user(entity.id)
     await update.message.reply_text(
         _(lang, "add_success", username=username),
@@ -752,14 +752,15 @@ async def receive_rename(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user_id:
         return ConversationHandler.END
     new_name = update.message.text.strip()
+    current_uid = update.effective_user.id
     if not new_name or new_name.lower() in ("cancel", "/cancel"):
-        db.set_display_name(user_id, None)
+        db.rename_user(user_id, "", current_uid)
         await update.message.reply_text(
             _(lang, "rename_cleared", username=display(user_id)),
             reply_markup=main_menu(lang),
         )
     else:
-        db.set_display_name(user_id, new_name)
+        db.rename_user(user_id, new_name, current_uid)
         await update.message.reply_text(
             _(lang, "rename_done", username=display(user_id), name=new_name),
             reply_markup=InlineKeyboardMarkup([
