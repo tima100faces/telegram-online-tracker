@@ -32,14 +32,18 @@ I built it because I wanted to track online patterns of people I care about with
 ## What it does
 
 - 🟢 **Catches exact online/offline timestamps** via MTProto `UpdateUserStatus` events
-- 🔔 **Push notifications** — DM when a tracked contact comes online or goes offline
-- 📊 **Daily session log** — see every online block for any day, paginated (5 per page)
-- 📅 **Date picker** — today, yesterday, or any custom YYYY-MM-DD date
+- 🔔 **Per-user notification modes** — online only, offline only, both, or mute (1/4/24h)
+- 🏷️ **Display names** — custom aliases for contacts instead of @usernames
+- 📊 **Statistics** — overall + per-user: total time, avg session, streak, hourly activity heatmap
+- 📅 **Daily session log** — paginated, date picker (today/yesterday/custom)
 - 📡 **`/getall`** — one-tap overview of all tracked contacts
-- 🛡️ **Whitelist access control** — only people you authorize can use the bot. Strangers get roasted with 13 different rude rejection messages (English, witty, not offensive)
-- 🔒 **Access log** — tracks every unauthorized attempt with username, count, and timestamp. Auto-bans after 5 attempts
-- 🌐 **i18n** — English and Russian interface, switchable from settings
-- ⚙️ **Inline settings menu** — language, notifications, whitelist, access log — all in one place
+- 📥 **CSV export** — download per-user session history
+- 🌐 **REST API** — `/health`, `/getall`, `/stats`, `/daily/<date>` on localhost:8091
+- 🛡️ **Whitelist access control** — only authorized users. Strangers get witty rejections (13 variants, English)
+- 🔒 **Access log** — tracks every unauthorized attempt, auto-bans after 5 tries
+- 🌐 **i18n** — English and Russian, switchable from settings
+- 🗜️ **Auto-cleanup** — sessions older than 90 days auto-deleted
+- 🔄 **Self-restart** — restart bot from settings menu
 
 ---
 
@@ -67,6 +71,7 @@ This is fundamentally different from every "online tracker" that polls with `/se
 | **MTProto client** | [Telethon](https://github.com/LonamiWebs/Telethon) | Direct Telegram protocol access, no Bot API limitations |
 | **Bot interface** | [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot) | Async, battle-tested, inline keyboard support |
 | **Database** | SQLite (WAL mode) | Zero-config, fast enough for personal use, single file |
+| **REST API** | Python stdlib `http.server` | `/health`, `/getall`, `/stats`, `/daily` — zero extra deps |
 | **Runtime** | Python 3.11+, systemd | Reliable, restart on crash, auto-start on boot |
 
 Everything runs in a **single process** — Telethon and the bot share one `asyncio` event loop, so there's no session file conflicts or IPC overhead.
@@ -164,7 +169,7 @@ Polling (`getEntity status → wait → repeat`) is rate-limited and will get yo
 
 ### Can I track someone who has "last seen" hidden?
 
-Yes, partially. When someone with hidden "last seen" goes offline, Telegram still sends `UserStatusOffline` with the `was_online` timestamp to connected clients. You'll get exact offline times. For online times — those only fire when the privacy setting allows it.
+**No.** If a user hides their online status in Telegram's privacy settings, MTProto won't send `UpdateUserStatus` events for them. The bot can **only** track users whose status you can see in the Telegram client itself — usually your contacts. If you see "last seen recently" instead of an exact time, the bot can't track them either.
 
 ### What happens if a stranger messages the bot?
 
