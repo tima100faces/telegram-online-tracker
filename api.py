@@ -19,6 +19,7 @@ import os
 import re
 import sys
 import threading
+import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
 
@@ -30,6 +31,7 @@ TOKEN = os.getenv("API_TOKEN")
 if not TOKEN:
     print("[api] WARNING: API_TOKEN is not set, all authenticated endpoints will return 401")
     TOKEN = ""
+START_TIME = time.monotonic()
 
 def check_auth(handler) -> bool:
     header = handler.headers.get("Authorization", "")
@@ -64,7 +66,7 @@ class APIHandler(BaseHTTPRequestHandler):
             stats = db.get_db_stats()
             return json_response(self, {
                 "status": "ok",
-                "uptime": "running",
+                "uptime_seconds": int(time.monotonic() - START_TIME),
                 "db_size_mb": stats["size_mb"],
                 "users": stats["users"],
                 "sessions": stats["sessions"],
