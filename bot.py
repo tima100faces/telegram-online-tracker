@@ -314,6 +314,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        return await _menu_callback(update, context)
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        if update.callback_query:
+            await update.callback_query.answer("⚠️ Error. Try /start.")
+        return
+
+
+async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     lang = guard(update)
     if not lang:
