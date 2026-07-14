@@ -33,12 +33,17 @@ def set_setting(key: str, value: str):
         )
 
 
-def get_lang() -> str:
+def get_lang(user_id: int = 0) -> str:
+    """Return language for user. Falls back: per-user key → global 'lang' → 'en'."""
+    if user_id:
+        per_user = get_setting(f"lang:{user_id}", "")
+        if per_user:
+            return per_user
     return get_setting("lang", "en")
 
 
-def set_lang(lang: str):
-    set_setting("lang", lang)
+def set_lang(user_id: int, lang: str):
+    set_setting(f"lang:{user_id}", lang)
 
 
 def get_notifications_enabled() -> bool:
