@@ -15,7 +15,7 @@ No polling. No scraping. No bans. Just clean, event-driven MTProto magic that ca
 </p>
 
 <p align="center">
-  <video src="assets/demo.mp4" autoplay loop muted playsinline width="320"></video>
+  <img src="https://idealabs.co/5.gif" alt="TG Online Tracker demo" width="320">
 </p>
 
 ---
