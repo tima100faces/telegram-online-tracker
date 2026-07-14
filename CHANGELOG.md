@@ -2,6 +2,44 @@
 
 All notable changes to Telegram Online Tracker.
 
+## [v8] — 2026-07-14
+
+### Fixed — Integration bugs (Round 1)
+- **Mute/Unmute crash**: `db.set_mute()` → `db.mute_user()` / `db.unmute_user()` — signatures matched
+- **Timezone mismatch**: mute logic used local `datetime.now()` while DB stores UTC; now `timezone.utc` everywhere
+- **/getall TypeError**: `get_last_seen()` required `tracked_by` but callers omitted it; made it optional with `= None`
+- **CSV export crash**: `get_export_data()` returned `user_id`/`went_online`/`went_offline` but `send_csv()` wrote `username`/`display_name`; SQL now JOINs `tracked_users`
+- **Daily log pagination broken**: `get_daily_log()` applied `LIMIT 5 OFFSET` in SQL AND caller sliced again — pages after the first were empty. Removed SQL-side pagination, kept it in `fmt_daily_log_for_user()`
+- **Custom date NameError**: `current_uid` undefined in `receive_date()` — added missing assignment
+- **daemon.py deleted**: dead file with outdated signatures, conflicted with bot.py over session file
+- **Notifications toggle did nothing**: `settings.get_notifications_enabled()` was toggled in UI but never checked before sending; now `on_status()` skips sends when off
+- **Display name precedence bug**: operator precedence in `contacts_list()` ignored `display_name` when `username` was empty — added parentheses
+
+### Fixed — Security hardening (Round 1)
+- `OWNER_ID` in bot.py: `os.getenv(..., "123456789")` → `os.environ["OWNER_ID"]` (fail fast if unset)
+- API auth: `if f"Bearer {TOKEN}" in header` → exact comparison `header == f"Bearer {TOKEN}"`
+- Removed `?token=` query-param auth path (tokens leak into server logs)
+- Removed `BOT_TOKEN` fallback for API auth; `API_TOKEN` unset → all endpoints return 401
+- Removed `Access-Control-Allow-Origin: *` header
+
+### Fixed — Tests (Round 1)
+- Always-true assertions replaced with real checks: `get_last_seen` both arg variants, CSV column names, mute round-trip, daily log pagination
+- `OWNER_ID` in test.py: hardcoded `84295013` → `int(os.getenv("OWNER_ID", "0"))`
+- Systemd checks skip gracefully when unavailable instead of crashing
+
+### Fixed — Follow-up (Round 2)
+- **Notification context silently broken**: session timestamps from SQLite are naive UTC strings, `datetime.fromisoformat()` returns naive datetime, subtracting from aware `now_utc` raised `TypeError` — caught by bare `except`. Now attaches `tzinfo=timezone.utc` after parsing
+- **Per-user language**: `get_lang()`/`set_lang()` were global; now per-user via `lang:<user_id>` keys with fallback global→en
+- **test.py crash without .env**: `import bot` required `BOT_TOKEN` etc.; added `os.environ.setdefault()` fallbacks before import
+- **API docstring**: removed stale «or BOT_TOKEN as fallback» mention
+
+### Changed — Cleanup (Round 3)
+- Module docstring: «daemon + bot» → «single-process bot»
+- Removed dead `import random`
+- Replaced deprecated `datetime.utcnow()` with `datetime.now(timezone.utc)` (+ `.replace(tzinfo=None)` for naive arithmetic)
+- Notification send failures now logged (`print`) instead of silently swallowed
+- `/health` uptime: `"uptime": "running"` → `"uptime_seconds": <real seconds>`
+
 ## [v7] — 2026-07-14
 
 ### Added

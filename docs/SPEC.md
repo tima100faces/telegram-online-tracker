@@ -1,4 +1,4 @@
-# Specification — TG Online Tracker v6
+# Specification — TG Online Tracker v8
 
 ## Objective
 
@@ -51,7 +51,7 @@ Track exact Telegram online/offline timestamps for specified users. Multi-user b
 - [x] Statistics: overall + per-user (total time, avg session, streak)
 - [x] Hourly activity chart — 24h emoji heatmap (⬜🟨🟧🟥🟩)
 - [x] REST API: `/health`, `/getall`, `/stats`, `/daily/<date>`
-- [x] API auth via Bearer token or `?token=` param
+- [x] API auth via Bearer token header (exact match, no query param)
 - [x] Zero external deps (stdlib `http.server`)
 
 ### v6 — Multi-User Isolation
@@ -62,12 +62,11 @@ Track exact Telegram online/offline timestamps for specified users. Multi-user b
 - [x] Admin-only settings: whitelist, access log, DB stats, restart
 - [x] Child accounts: language + notification toggle only
 
-### Planned (v7+)
+### v7 — Open Beta (Released)
+- [x] **Open Beta mode** — toggle in Settings (admin only): whitelist bypass, auto-registration, 10-contact limit, onboarding message
 
-- [ ] **Daily summary** — scheduled report: "X was online 3.2h today, Y — 1.5h", configurable delivery time
-- [ ] **Owner super-admin panel** — view all users, their contacts, manage whitelist from bot UI
-- [ ] **Per-user preferences** — language and notification toggle per bot user (currently global)
-- [ ] **Web dashboard** — browser-based stats view, not in Telegram
+### Planned (v8+)
+- [ ] **Per-user preferences** — notification toggle per bot user (currently global toggle)
 
 ## Technical Constraints
 

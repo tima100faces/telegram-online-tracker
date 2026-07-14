@@ -30,7 +30,7 @@ TG Online Tracker runs as a single process combining three asyncio components:
 
 ## Components
 
-### 1. Telethon Daemon
+### 1. Telethon Listener
 
 - Connects to MTProto with user account session
 - Listens for `events.UserUpdate` (push, not polling)
@@ -49,8 +49,8 @@ TG Online Tracker runs as a single process combining three asyncio components:
 ### 3. REST API (stdlib `http.server`)
 
 - Runs on `127.0.0.1:8091`
-- Auth: Bearer token or `?token=` query param
-- Endpoints: `/health`, `/getall`, `/stats`, `/daily/<date>`
+- Auth: `Authorization: Bearer <API_TOKEN>` header (exact match); unset → 401
+- Endpoints: `/health` (no auth), `/getall`, `/stats/<id>`, `/stats`, `/daily/<date>`
 - Zero external dependencies
 
 ### 4. Database (SQLite, WAL mode)
@@ -69,7 +69,7 @@ TG Online Tracker runs as a single process combining three asyncio components:
 - `tracked_by` — which bot user's tracking generated this session
 
 `settings` — global key-value config:
-- `key` (PK), `value` — stores `lang`, `notifications`
+- `key` (PK), `value` — stores `lang` (global fallback), `lang:<user_id>` (per-user), `notifications`, `open_mode`
 
 `whitelist` — authorized bot users:
 - `user_id` (PK), `username`, `added_by`, `added_at`
@@ -79,7 +79,7 @@ TG Online Tracker runs as a single process combining three asyncio components:
 
 ### 5. i18n
 
-`i18n.py` contains dictionaries (`ru`, `en`) with 100+ UI strings, plus 13 rude rejection messages per language. Language is global (stored in `settings` table), not per-user yet.
+`i18n.py` contains dictionaries (`ru`, `en`) with 118 UI strings, plus 13 rude rejection messages. Language is per-user via `lang:<user_id>` keys, falling back to a global `lang` key then `"en"`.
 
 ## Data Flow
 

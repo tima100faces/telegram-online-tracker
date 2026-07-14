@@ -43,7 +43,9 @@ I built it because I wanted to track online patterns of people I care about with
 - 📅 **Daily session log** — paginated, date picker (today/yesterday/custom)
 - 📡 **`/getall`** — one-tap overview of all tracked contacts
 - 📥 **CSV export** — download per-user session history
-- 🌐 **REST API** — `/health`, `/getall`, `/stats`, `/daily/<date>` on localhost:8091
+- 🌐 **REST API** — `/health`, `/getall`, `/stats`, `/daily/<date>` on localhost:8091 (auth via `Authorization: Bearer <token>` header)
+- 🗣️ **Per-user language** — each user switches EN/RU independently
+- 🔔 **Per-user notification toggle** — notifications on/off, actually works now
 - 🛡️ **Whitelist access control** — only authorized users. Strangers get witty rejections (13 variants, English)
 - 🔒 **Access log** — tracks every unauthorized attempt, auto-bans after 5 tries
 - 🌐 **i18n** — English and Russian, switchable from settings
@@ -58,7 +60,7 @@ I built it because I wanted to track online patterns of people I care about with
 You add @friend to tracking
         │
         ▼
-Telethon daemon listens for UpdateUserStatus events (MTProto)
+Telethon listener catches UpdateUserStatus events (MTProto)
         │
         ├── UserStatusOnline  → write "went online" to SQLite + send notification
         │
@@ -132,17 +134,20 @@ For production, use the included systemd service file or run it under `screen`/`
 
 ## Project structure
 
-```
+```text
 telegram-online-tracker/
-├── bot.py              # Main process: Telethon daemon + Telegram bot
+├── bot.py              # Main process: Telethon listener + Telegram bot
+├── api.py              # REST API: /health, /getall, /stats, /daily
+├── test.py             # Test suite (DB, i18n, callbacks, pagination)
 ├── i18n.py             # EN/RU string tables + 13 rude rejection messages
 ├── db/
 │   ├── __init__.py
-│   ├── core.py         # Users, sessions, daily log
-│   └── settings.py     # Whitelist, access log, config
+│   ├── core.py         # Users, sessions, daily log, mute, stats
+│   └── settings.py     # Whitelist, access log, per-user language, config
 ├── docs/
 │   ├── ARCHITECTURE.md # Data flow, components, security model
-│   └── SPEC.md         # Feature spec with planned work
+│   ├── SPEC.md         # Feature spec with planned work
+│   └── marketing/      # Reddit/X post drafts
 ├── requirements.txt
 └── .env.example        # Template (copy to .env, never commit real one)
 ```
