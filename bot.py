@@ -50,12 +50,12 @@ def guard(update: Update) -> str | None:
     """Check access. Returns lang if allowed, None if blocked."""
     uid = update.effective_user.id
     if uid == OWNER_ID or settings.is_whitelisted(uid):
-        return settings.get_lang()
+        return settings.get_lang(uid)
     # Open beta: auto-whitelist new users
     if settings.is_open_mode():
         uname = update.effective_user.username or ""
         settings.add_to_whitelist(uid, uname, 0)
-        return settings.get_lang()
+        return settings.get_lang(uid)
     return None
 
 
@@ -591,7 +591,7 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data == "toggle_lang":
         new_lang = "en" if lang == "ru" else "ru"
-        settings.set_lang(new_lang)
+        settings.set_lang(current_uid, new_lang)
         old_msg = query.message
         lang = new_lang
         await query.edit_message_text(_(lang, "settings_title"), reply_markup=settings_menu(lang, current_uid))
@@ -969,6 +969,8 @@ def make_status_handler(bot_app):
                     if prev and prev["went_offline"]:
                         try:
                             prev_off = datetime.fromisoformat(str(prev["went_offline"]))
+                            if prev_off.tzinfo is None:
+                                prev_off = prev_off.replace(tzinfo=timezone.utc)
                             delta = int((now_utc - prev_off).total_seconds())
                             if delta > 0:
                                 ctx = f" (was offline {_fmt_duration(delta)})"
@@ -999,6 +1001,8 @@ def make_status_handler(bot_app):
                     if prev and prev["went_online"]:
                         try:
                             prev_on = datetime.fromisoformat(str(prev["went_online"]))
+                            if prev_on.tzinfo is None:
+                                prev_on = prev_on.replace(tzinfo=timezone.utc)
                             delta = int((now_utc - prev_on).total_seconds())
                             if delta > 0:
                                 ctx = f" (session {_fmt_duration(delta)})"
