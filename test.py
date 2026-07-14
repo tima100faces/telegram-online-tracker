@@ -37,7 +37,7 @@ from db.core import (init_db, add_user, remove_user, get_active_users, get_user,
                      rename_user, get_user_stats, get_hourly_activity, get_overall_stats,
                      get_db_stats, cleanup_old_sessions, vacuum_db)
 from db import settings
-OWNER_ID = int(os.getenv("OWNER_ID", "84295013"))
+OWNER_ID = int(os.getenv("OWNER_ID", "0"))
 init_db()
 test("init_db() no errors", True)
 
@@ -185,48 +185,96 @@ for lang in ["en", "ru"]:
         has_placeholder = "{" in val and val != key
         test(f"{lang}.{key}(...) → formatted", not has_placeholder, f"unresolved: '{val}'")
 
-# ==================== 8. LOG FLOW SIMULATION ====================
-h1("8. Log Flow Simulation")
-users = get_active_users(OWNER_ID)
-if users:
-    uid = users[0]["user_id"]
-    # Test get_daily_log
-    today = datetime.utcnow().strftime("%Y-%m-%d")
-    sessions = get_daily_log(uid, today, tracked_by=OWNER_ID)
-    test(f"get_daily_log({uid}, today) returns {len(sessions)} sessions", True)
-    # Test get_last_seen
-    ls = get_last_seen(uid, OWNER_ID)
-    test(f"get_last_seen({uid}) returns value", ls is not None or True, str(ls))
-    # Test is_online_now
-    on = is_online_now(uid, OWNER_ID)
-    test(f"is_online_now({uid}) returns bool", isinstance(on, bool))
+# ==================== 8. DB FUNCTION TESTS ====================
+h1("8. DB Function Tests")
 
-data = get_export_data(users[0]["user_id"], days=365, tracked_by=OWNER_ID) if users else []
-h1("9. CSV Export")
-test(f"get_export_data returns {len(data)} rows", len(data) >= 0)
+# 8a — get_last_seen with and without tracked_by
+today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+start_session(TEST_ID, OWNER_ID)
+end_session(TEST_ID, OWNER_ID)
+ls = get_last_seen(TEST_ID, OWNER_ID)
+test("get_last_seen(TEST_ID, OWNER_ID) returns value", ls is not None)
+ls2 = get_last_seen(TEST_ID, None)
+test("get_last_seen(TEST_ID, None) returns value", ls2 is not None)
+on = is_online_now(TEST_ID, OWNER_ID)
+test("is_online_now returns bool", isinstance(on, bool))
+
+# 8b — CSV export returns username + display_name
+data = get_export_data(TEST_ID, days=365, tracked_by=OWNER_ID)
+test("get_export_data returns rows", len(data) >= 0)
 if data:
-    buf = io.StringIO()
-    w = csv.writer(buf)
-    w.writerow(["user_id", "went_online", "went_offline"])
-    for row in data:
-        w.writerow([row["user_id"], row["went_online"], row["went_offline"]])
-    buf.seek(0)
-    test("CSV has header", buf.readline().startswith("user_id"))
-    test("CSV has data rows", len(buf.readlines()) > 0)
+    row = data[0]
+    has_keys = "username" in row.keys() and "display_name" in row.keys()
+    test("CSV rows have username key", "username" in row.keys())
+    test("CSV rows have display_name key", "display_name" in row.keys())
+    test("CSV rows have went_online key", "went_online" in row.keys())
+
+# 8c — Mute round-trip
+test("mute round-trip: not muted", not is_muted(TEST_ID, OWNER_ID))
+mute_user(TEST_ID, 1, OWNER_ID)
+test("mute round-trip: is_muted", is_muted(TEST_ID, OWNER_ID))
+unmute_user(TEST_ID, OWNER_ID)
+test("mute round-trip: unmuted", not is_muted(TEST_ID, OWNER_ID))
+
+# 8d — get_daily_log returns a list
+sessions = get_daily_log(TEST_ID, today, tracked_by=OWNER_ID)
+test("get_daily_log returns list", isinstance(sessions, list))
+test("get_daily_log is not tuple", not isinstance(sessions, tuple))
+
+# 8e — Daily log pagination with >5 fake sessions
+h1("9. Daily Log Pagination")
+# Insert 7 fake sessions for TEST_ID
+from db.core import get_conn
+with get_conn() as conn:
+    for i in range(7):
+        conn.execute(
+            "INSERT INTO online_sessions(user_id, went_online, went_offline, tracked_by) VALUES (?, datetime('now', ?), datetime('now', ?), ?)",
+            (TEST_ID, f"-{i} hours", f"-{i} hours +30 minutes", OWNER_ID),
+        )
+sessions = get_daily_log(TEST_ID, today, tracked_by=OWNER_ID)
+test(f"get_daily_log has {len(sessions)} sessions (>=7)", len(sessions) >= 7)
+
+# Simulate fmt_daily_log_for_user pagination logic
+from bot import fmt_daily_log_for_user
+name = "testuser"
+text0, tp0 = fmt_daily_log_for_user("en", TEST_ID, name, today, 0, OWNER_ID)
+text1, tp1 = fmt_daily_log_for_user("en", TEST_ID, name, today, 1, OWNER_ID)
+test("page 0 has content", len(text0) > 0)
+test("page 1 has content (no empty page)", len(text1) > 0)
+test("total_pages > 0", tp0 > 0)
+
+# Cleanup fake sessions
+with get_conn() as conn:
+    conn.execute("DELETE FROM online_sessions WHERE user_id=? AND tracked_by=?", (TEST_ID, OWNER_ID))
 
 # ==================== 10. SERVICE HEALTH ====================
 h1("10. Service Health")
-r = subprocess.run(["systemctl", "is-active", "tg-online-tracker"], capture_output=True, text=True)
-test("service is active", r.stdout.strip() == "active", r.stdout.strip())
-r = subprocess.run(["grep", "-c", "error|Traceback", "/root/tg-online-tracker/data/service.log"],
-                   capture_output=True, text=True)
-if r.returncode == 0:
-    count = int(r.stdout.strip())
-    test("no errors in service log", count == 0, f"{count} errors found")
+if os.path.exists("/usr/bin/systemctl"):
+    try:
+        r = subprocess.run(["systemctl", "is-active", "tg-online-tracker"], capture_output=True, text=True)
+        test("service is active", r.stdout.strip() == "active", r.stdout.strip())
+    except Exception:
+        print("  ⏭️  systemctl unavailable, skipping service check")
 else:
-    test("no errors in service log (grep found 0)", True)
+    print("  ⏭️  systemctl not found, skipping service check")
+
+log_path = "/root/tg-online-tracker/data/service.log"
+if os.path.exists(log_path):
+    try:
+        r = subprocess.run(["grep", "-c", "error|Traceback", log_path],
+                           capture_output=True, text=True)
+        if r.returncode == 0:
+            count = int(r.stdout.strip())
+            test("no errors in service log", count == 0, f"{count} errors found")
+        else:
+            test("no errors in service log (grep found 0)", True)
+    except Exception:
+        print("  ⏭️  Could not check service log, skipping")
+else:
+    print(f"  ⏭️  Log file not found ({log_path}), skipping log check")
 
 # ==================== CLEANUP ====================
+h1("CLEANUP")
 remove_user(TEST_ID, OWNER_ID)
 
 # ==================== SUMMARY ====================
