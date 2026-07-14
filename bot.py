@@ -168,7 +168,7 @@ def whitelist_menu(lang: str):
 # ── Format helpers ───────────────────────────────────────────────────
 
 
-def display(user_id: int) -> str:
+def display(user_id: int, tracked_by: int | None = None) -> str:
     """Resolve best display name: custom > username > user_id."""
     user = db.get_user(user_id, tracked_by)
     if not user:
@@ -439,7 +439,7 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for u in s["users"]:
             lines.append(_(lang, "stats_user_row", name=u["name"], sessions=u["sessions"], hours=u["total_h"]))
 
-        users = db.get_active_users(tracked_by)
+        users = db.get_active_users(current_uid)
         btns = []
         for u in users:
             name = u["display_name"] or u["username"] or str(u["user_id"])
@@ -840,64 +840,77 @@ def make_status_handler(bot_app):
         user_id = event.user_id
         status = event.status
 
-        tracked_ids = {u["user_id"] for u in db.get_active_users(tracked_by)}
+        # Get all tracked user IDs across ALL bot users
+        all_tracked = {u["user_id"] for u in db.get_active_users()}
+        tracked_ids = all_tracked
         if user_id not in tracked_ids:
-            return
-
-        user = db.get_user(user_id)
-        if not user:
             return
 
         now_utc = datetime.now(timezone.utc)
 
-        if isinstance(status, UserStatusOnline):
-            db.start_session(user_id)
-            print(f"[{now_utc}] 🟢 user_id={user_id} → online")
+        # Find all bot users tracking this Telegram user
+        trackers = set()
+        for u in db.get_active_users():
+            if u["user_id"] == user_id:
+                trackers.add(u["tracked_by"])
+        if not trackers:
+            return
 
-            mode = db.get_notify_mode(user_id, tracked_by)
-            if mode in ("online", "both") and not db.is_muted(user_id):
-                # Context: how long were they offline?
-                prev = db.get_prev_session(user_id)
-                ctx = ""
-                if prev and prev["went_offline"]:
+        if isinstance(status, UserStatusOnline):
+            for tu in trackers:
+                db.start_session(user_id, tu)
+            print(f"[{now_utc}] 🟢 user_id={user_id} (tracked by {len(trackers)}) → online")
+
+            for tu in trackers:
+                user = db.get_user(user_id, tu)
+                if not user:
+                    continue
+                mode = db.get_notify_mode(user_id, tu)
+                if mode in ("online", "both") and not db.is_muted(user_id, tu):
+                    prev = db.get_prev_session(user_id, tu)
+                    ctx = ""
+                    if prev and prev["went_offline"]:
+                        try:
+                            prev_off = datetime.fromisoformat(str(prev["went_offline"]))
+                            delta = int((now_utc - prev_off).total_seconds())
+                            if delta > 0:
+                                ctx = f" (was offline {_fmt_duration(delta)})"
+                        except (ValueError, TypeError):
+                            pass
+                    name = user["display_name"] or user["username"] or str(user_id)
+                    text = f"🟢 {name} online{ctx}"
                     try:
-                        prev_off = datetime.fromisoformat(str(prev["went_offline"]))
-                        delta = int((now_utc - prev_off).total_seconds())
-                        if delta > 0:
-                            ctx = f" (was offline {_fmt_duration(delta)})"
-                    except (ValueError, TypeError):
+                        await bot_app.bot.send_message(tu, text)
+                    except Exception:
                         pass
-                name = (user["display_name"] or user["username"] or str(user_id)) if user else str(user_id)
-                text = f"🟢 {name} online{ctx}"
-                try:
-                    await bot_app.bot.send_message(OWNER_ID, text)
-                except Exception:
-                    pass
 
         elif isinstance(status, UserStatusOffline):
-            for tu in tracking_users:
+            for tu in trackers:
                 db.end_session(user_id, tu)
-            print(f"[{now_utc}] ⚫ user_id={user_id} → offline")
+            print(f"[{now_utc}] ⚫ user_id={user_id} (tracked by {len(trackers)}) → offline")
 
-            mode = db.get_notify_mode(user_id, tracked_by)
-            if mode in ("offline", "both") and not db.is_muted(user_id):
-                # Context: how long was the session?
-                prev = db.get_prev_session(user_id)
-                ctx = ""
-                if prev and prev["went_online"]:
+            for tu in trackers:
+                user = db.get_user(user_id, tu)
+                if not user:
+                    continue
+                mode = db.get_notify_mode(user_id, tu)
+                if mode in ("offline", "both") and not db.is_muted(user_id, tu):
+                    prev = db.get_prev_session(user_id, tu)
+                    ctx = ""
+                    if prev and prev["went_online"]:
+                        try:
+                            prev_on = datetime.fromisoformat(str(prev["went_online"]))
+                            delta = int((now_utc - prev_on).total_seconds())
+                            if delta > 0:
+                                ctx = f" (session {_fmt_duration(delta)})"
+                        except (ValueError, TypeError):
+                            pass
+                    name = user["display_name"] or user["username"] or str(user_id)
+                    text = f"⚫ {name} offline{ctx}"
                     try:
-                        prev_on = datetime.fromisoformat(str(prev["went_online"]))
-                        delta = int((now_utc - prev_on).total_seconds())
-                        if delta > 0:
-                            ctx = f" (session {_fmt_duration(delta)})"
-                    except (ValueError, TypeError):
+                        await bot_app.bot.send_message(tu, text)
+                    except Exception:
                         pass
-                name = (user["display_name"] or user["username"] or str(user_id)) if user else str(user_id)
-                text = f"⚫ {name} offline{ctx}"
-                try:
-                    await bot_app.bot.send_message(OWNER_ID, text)
-                except Exception:
-                    pass
 
     return on_status
 

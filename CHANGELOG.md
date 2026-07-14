@@ -2,6 +2,20 @@
 
 All notable changes to Telegram Online Tracker.
 
+## [v6] — 2026-07-14
+
+### Added
+- **Multi-user isolation** — each whitelisted user has their own workspace
+- `tracked_by` column in `tracked_users` and `online_sessions`
+- Per-user views: contacts, stats, logs — filtered by who added them
+- **Notifications go only to the user who added the contact** (not to owner)
+- Telethon handler creates sessions per tracking user
+
+### Changed
+- All DB functions accept optional `tracked_by` parameter
+- `get_active_users()` — polymorphic: with arg = filtered, without = all
+- Helper functions (`contacts_list`, `user_picker`, etc.) pass through tracked_by
+
 ## [v5] — 2026-07-14
 
 ### Added

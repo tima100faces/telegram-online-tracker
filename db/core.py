@@ -111,11 +111,15 @@ def remove_user(user_id: int, tracked_by: int):
         )
 
 
-def get_active_users(tracked_by: int):
+def get_active_users(tracked_by: int | None = None):
     with get_conn() as conn:
+        if tracked_by is not None:
+            return conn.execute(
+                "SELECT * FROM tracked_users WHERE active=1 AND tracked_by=? ORDER BY username",
+                (tracked_by,),
+            ).fetchall()
         return conn.execute(
-            "SELECT * FROM tracked_users WHERE active=1 AND tracked_by=? ORDER BY username",
-            (tracked_by,),
+            "SELECT * FROM tracked_users WHERE active=1 ORDER BY username"
         ).fetchall()
 
 
