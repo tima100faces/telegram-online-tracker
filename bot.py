@@ -881,6 +881,10 @@ async def main():
     await app.updater.start_polling()
     print(f"[main] Bot polling started. @{app.bot.username}")
 
+    # Start REST API on localhost (zero-dependency, thread-safe)
+    import api as _api
+    _api.run_api()
+
     try:
         await telethon.run_until_disconnected()
     finally:
