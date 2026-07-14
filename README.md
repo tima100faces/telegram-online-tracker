@@ -14,6 +14,10 @@ No polling. No scraping. No bans. Just clean, event-driven MTProto magic that ca
   <img src="https://img.shields.io/badge/SQLite-local-orange" alt="SQLite local storage">
 </p>
 
+<p align="center">
+  <img src="assets/demo.gif" alt="TG Online Tracker demo" width="320">
+</p>
+
 ---
 
 ## Why this exists
