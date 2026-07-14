@@ -267,3 +267,91 @@ def vacuum_db():
     """Compact the database file."""
     with get_conn() as conn:
         conn.execute("VACUUM")
+
+
+def get_user_stats(user_id: int):
+    """Return per-user aggregated stats."""
+    with get_conn() as conn:
+        total = conn.execute(
+            "SELECT COUNT(*) as sessions,"
+            " SUM(CAST((julianday(COALESCE(went_offline, datetime('now')))"
+            " - julianday(went_online)) * 86400 AS INTEGER)) as total_sec"
+            " FROM online_sessions WHERE user_id=?",
+            (user_id,),
+        ).fetchone()
+        avg = conn.execute(
+            "SELECT CAST(AVG(CAST((julianday(went_offline) - julianday(went_online))"
+            " * 86400 AS INTEGER)) AS INTEGER) as avg_sec"
+            " FROM online_sessions WHERE user_id=? AND went_offline IS NOT NULL",
+            (user_id,),
+        ).fetchone()
+        # Longest/shortest
+        extremes = conn.execute(
+            "SELECT"
+            " MAX(CAST((julianday(went_offline) - julianday(went_online)) * 86400 AS INTEGER)) as longest,"
+            " MIN(CAST((julianday(went_offline) - julianday(went_online)) * 86400 AS INTEGER)) as shortest"
+            " FROM online_sessions WHERE user_id=? AND went_offline IS NOT NULL",
+            (user_id,),
+        ).fetchone()
+        # Streak
+        streak = conn.execute(
+            "SELECT COUNT(DISTINCT date(went_online)) FROM online_sessions"
+            " WHERE user_id=? AND date(went_online) >= date('now', '-30 days')",
+            (user_id,),
+        ).fetchone()[0]
+        secs = total["total_sec"] or 0
+        avg_sec = avg["avg_sec"] or 0
+        return {
+            "sessions": total["sessions"],
+            "total_sec": secs,
+            "total_h": round(secs / 3600, 1),
+            "avg_min": round(avg_sec / 60, 1),
+            "longest_min": round((extremes["longest"] or 0) / 60, 1),
+            "shortest_sec": extremes["shortest"] or 0,
+            "streak_days": streak,
+        }
+
+
+def get_hourly_activity(user_id: int, days: int = 7):
+    """Return list of (hour, count) for 0-23."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT CAST(strftime('%H', went_online) AS INTEGER) as h, COUNT(*) as cnt"
+            " FROM online_sessions WHERE user_id=? AND date(went_online) >= date('now', ?)"
+            " GROUP BY h ORDER BY h",
+            (user_id, f"-{days} days"),
+        ).fetchall()
+        lookup = {r["h"]: r["cnt"] for r in rows}
+        return [(h, lookup.get(h, 0)) for h in range(24)]
+
+
+def get_overall_stats():
+    """Return global stats across all active users."""
+    with get_conn() as conn:
+        total_sessions = conn.execute("SELECT COUNT(*) FROM online_sessions").fetchone()[0]
+        total_sec = conn.execute(
+            "SELECT SUM(CAST((julianday(COALESCE(went_offline, datetime('now')))"
+            " - julianday(went_online)) * 86400 AS INTEGER)) FROM online_sessions"
+        ).fetchone()[0] or 0
+        users = conn.execute(
+            "SELECT t.user_id, t.username, t.display_name,"
+            " COUNT(s.user_id) as sessions,"
+            " SUM(CAST((julianday(COALESCE(s.went_offline, datetime('now')))"
+            " - julianday(s.went_online)) * 86400 AS INTEGER)) as total_sec"
+            " FROM tracked_users t LEFT JOIN online_sessions s ON t.user_id=s.user_id"
+            " WHERE t.active=1 GROUP BY t.user_id ORDER BY total_sec DESC"
+        ).fetchall()
+        top = [
+            {
+                "user_id": u["user_id"],
+                "name": u["display_name"] or u["username"] or str(u["user_id"]),
+                "sessions": u["sessions"] or 0,
+                "total_h": round((u["total_sec"] or 0) / 3600, 1),
+            }
+            for u in users
+        ]
+        return {
+            "total_sessions": total_sessions,
+            "total_h": round(total_sec / 3600, 1),
+            "users": top,
+        }

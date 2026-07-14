@@ -76,6 +76,7 @@ pattern = re.compile(
     r"|toggle_lang|toggle_notifications|whitelist_menu|noop"
     r"|access_log|clearlog"
     r"|db_stats|cleanup_db|restart_confirm|do_restart"
+    r"|stats|ustats_\d+"
     r"|remove_\d+|ls_\d+|log_\d+|log_\d+_\S+|date_\d+_\S+|wldel_\d+|unblock_\d+"
     r"|user_\d+|notifymode_\d+|rename_\d+|mute_\d+_\d+|unmute_\d+|export_\d+)$"
 )
@@ -86,8 +87,9 @@ valid = [
     "remove_123", "ls_123", "log_123", "log_123_2026-07-14", "log_123_2026-07-14_2",
     "date_123_2026-07-14", "date_123_2026-07-14", "wldel_123", "unblock_123",
     "user_123", "notifymode_123", "rename_123", "mute_123_1", "unmute_123", "export_123",
-    "db_stats", "cleanup_db", "restart_confirm", "do_restart",
-]
+ "db_stats", "cleanup_db", "restart_confirm", "do_restart",
+ "stats", "ustats_123",
+ ]
 invalid = ["add", "wladd", "datepick_123", "ls_", "x", ""]
 for cb in valid:
     test(f"match '{cb}'", bool(pattern.match(cb)), cb)
@@ -175,6 +177,8 @@ for lang in ["en", "ru"]:
         "btn_clear_log": {},
         "cleared_log": {},
         "btn_whitelist": {},
+        "btn_stats": {},
+        "stats_overall": {"sessions": 100, "hours": 50},
     }
     for key, kwargs in format_tests.items():
         val = _(lang, key, **kwargs)

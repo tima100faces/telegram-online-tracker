@@ -88,6 +88,7 @@ def main_menu(lang: str):
         [
             InlineKeyboardButton(_(lang, "btn_lastseen"), callback_data="lastseen"),
             InlineKeyboardButton(_(lang, "btn_log"), callback_data="fulllog"),
+            InlineKeyboardButton(_(lang, "btn_stats"), callback_data="stats"),
         ],
         [InlineKeyboardButton(_(lang, "btn_settings"), callback_data="settings")],
     ])
@@ -413,6 +414,79 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             fmt_getall(lang),
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton(_(lang, "back"), callback_data="menu")]
+            ]),
+        )
+
+    # ── v5: Stats ──────────────────────────────────────────────────
+    elif data == "stats":
+        s = db.get_overall_stats()
+        if not s["total_sessions"]:
+            await query.answer(_(lang, "stats_no_data"), show_alert=True)
+            return
+
+        lines = [
+            _(lang, "stats_title"),
+            "",
+            _(lang, "stats_overall", sessions=s["total_sessions"], hours=s["total_h"]),
+            "",
+            _(lang, "stats_top"),
+        ]
+        for u in s["users"]:
+            lines.append(_(lang, "stats_user_row", name=u["name"], sessions=u["sessions"], hours=u["total_h"]))
+
+        users = db.get_active_users()
+        btns = []
+        for u in users:
+            name = u["display_name"] or u["username"] or str(u["user_id"])
+            btns.append([InlineKeyboardButton(name, callback_data=f"ustats_{u['user_id']}")])
+        btns.append([InlineKeyboardButton(_(lang, "back"), callback_data="menu")])
+
+        await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(btns))
+
+    elif data.startswith("ustats_"):
+        user_id = int(data.split("_")[1])
+        name = display(user_id)
+        s = db.get_user_stats(user_id)
+        hourly = db.get_hourly_activity(user_id, 7)
+
+        if not s["sessions"]:
+            await query.answer(_(lang, "stats_no_data"), show_alert=True)
+            return
+
+        lines = [
+            _(lang, "stats_user_title", name=name),
+            "",
+            _(lang, "stats_sessions", sessions=s["sessions"]),
+            _(lang, "stats_total_time", hours=s["total_h"]),
+            _(lang, "stats_avg_session", avg=s["avg_min"]),
+            _(lang, "stats_longest", longest=s["longest_min"]),
+        ]
+        if s["streak_days"]:
+            lines.append(_(lang, "stats_streak", streak=s["streak_days"]))
+
+        # Hourly activity bar
+        max_count = max(c for _, c in hourly) or 1
+        bar_chars = ["⬜", "🟨", "🟧", "🟥", "🟩"]
+        row1 = ""
+        row2 = ""
+        for h, cnt in hourly:
+            if h % 6 == 0 and h > 0:
+                row1 += " "
+                row2 += " "
+            idx = 0
+            if cnt > 0:
+                idx = min(4, max(1, int(cnt / max_count * 4)))
+            row1 += bar_chars[idx]
+            row2 += f"{h:02d}"
+        lines.append("")
+        lines.append(_(lang, "stats_hourly"))
+        lines.append(row1)
+        lines.append(row2)
+
+        await query.edit_message_text(
+            "\n".join(lines),
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton(_(lang, "back"), callback_data="stats")]
             ]),
         )
 
@@ -859,6 +933,7 @@ async def main():
         "|toggle_lang|toggle_notifications|whitelist_menu|noop"
         "|access_log|clearlog"
         "|db_stats|cleanup_db|restart_confirm|do_restart"
+        "|stats|ustats_\\d+"
         "|remove_\\d+|ls_\\d+|log_\\d+|log_\\d+_\\S+|date_\\d+_\\S+|wldel_\\d+|unblock_\\d+"
         "|user_\\d+|notifymode_\\d+|rename_\\d+|mute_\\d+_\\d+|unmute_\\d+|export_\\d+)$"
     )
@@ -881,7 +956,7 @@ async def main():
     await app.updater.start_polling()
     print(f"[main] Bot polling started. @{app.bot.username}")
 
-    # Start REST API on localhost (zero-dependency, thread-safe)
+    # Start REST API on localhost
     import api as _api
     _api.run_api()
 

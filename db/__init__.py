@@ -8,4 +8,5 @@ from .core import (
     set_mute, is_muted,
     get_prev_session, get_export_data,
     get_db_stats, cleanup_old_sessions, vacuum_db,
+    get_user_stats, get_hourly_activity, get_overall_stats,
 )
