@@ -7,6 +7,19 @@ and simulates button-click flows.
 import re, sys, os, io, csv, subprocess
 
 os.environ.setdefault("DB_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "tracker.db"))
+
+# Safe dummy defaults so test.py can import bot.py without a full .env.
+# load_dotenv() does NOT override already-set env vars, so real .env wins in prod.
+for k, v in {
+    "BOT_TOKEN": "0:dummy",
+    "TG_API_ID": "1",
+    "TG_API_HASH": "dummy",
+    "TG_PHONE_PART1": "+0",
+    "TG_PHONE_PART2": "0000000",
+    "OWNER_ID": "0",
+}.items():
+    os.environ.setdefault(k, v)
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 FAILURES = []
@@ -247,8 +260,33 @@ test("total_pages > 0", tp0 > 0)
 with get_conn() as conn:
     conn.execute("DELETE FROM online_sessions WHERE user_id=? AND tracked_by=?", (TEST_ID, OWNER_ID))
 
-# ==================== 10. SERVICE HEALTH ====================
-h1("10. Service Health")
+# 9b — Naive vs aware datetime (notification context fix)
+h1("10. Naive Datetime Context Fix")
+past_time = datetime.now(timezone.utc) - timedelta(hours=2)
+naive_str = past_time.strftime("%Y-%m-%d %H:%M:%S")
+parsed = datetime.fromisoformat(naive_str)
+test("parsed datetime is naive", parsed.tzinfo is None)
+parsed_aware = parsed.replace(tzinfo=timezone.utc)
+now_utc = datetime.now(timezone.utc)
+delta = int((now_utc - parsed_aware).total_seconds())
+test("naive+utc datetime subtracts from aware now_utc", delta > 0)
+
+# 9c — Per-user language
+h1("11. Per-User Language")
+from db import settings as _settings
+USER_A = TEST_ID + 1
+USER_B = TEST_ID + 2
+_settings.set_lang(USER_A, "ru")
+_settings.set_lang(USER_B, "en")
+test("user A reads ru", _settings.get_lang(USER_A) == "ru")
+test("user B reads en", _settings.get_lang(USER_B) == "en")
+test("brand-new user falls back to default", _settings.get_lang(99998) == "en")
+# Cleanup: remove per-user keys (settings table uses key-value, just overwrite)
+_settings.set_lang(USER_A, "en")
+_settings.set_lang(USER_B, "en")
+
+# ==================== 12. SERVICE HEALTH ====================
+h1("12. Service Health")
 if os.path.exists("/usr/bin/systemctl"):
     try:
         r = subprocess.run(["systemctl", "is-active", "tg-online-tracker"], capture_output=True, text=True)
