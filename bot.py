@@ -431,7 +431,12 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "stats":
         s = db.get_overall_stats(current_uid)
         if not s["total_sessions"]:
-            await query.answer(_(lang, "stats_no_data"), show_alert=True)
+            await query.edit_message_text(
+                _(lang, "stats_no_data"),
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton(_(lang, "back"), callback_data="menu")]
+                ]),
+            )
             return
 
         lines = [
@@ -460,7 +465,12 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         hourly = db.get_hourly_activity(user_id, 7, current_uid)
 
         if not s["sessions"]:
-            await query.answer(_(lang, "stats_no_data"), show_alert=True)
+            await query.edit_message_text(
+                _(lang, "stats_no_data"),
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton(_(lang, "back"), callback_data="stats")]
+                ]),
+            )
             return
 
         lines = [
