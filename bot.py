@@ -131,19 +131,22 @@ def date_picker(lang: str, user_id: int):
     ])
 
 
-def settings_menu(lang: str):
+def settings_menu(lang: str, current_uid: int = 0):
     notif = _(lang, "notifications_on") if settings.get_notifications_enabled() else _(lang, "notifications_off")
-    wl_count = len(settings.get_whitelist())
-    al_count = len(settings.get_access_log())
-    return InlineKeyboardMarkup([
+    kb = [
         [InlineKeyboardButton(_(lang, "settings_language", lang_name="RU" if lang == "ru" else "EN"), callback_data="toggle_lang")],
         [InlineKeyboardButton(_(lang, "notification_settings", state=notif), callback_data="toggle_notifications")],
-        [InlineKeyboardButton(_(lang, "settings_whitelist", count=wl_count), callback_data="whitelist_menu")],
-        [InlineKeyboardButton(_(lang, "btn_access_log", total=al_count), callback_data="access_log")],
-        [InlineKeyboardButton(_(lang, "db_stats_title"), callback_data="db_stats")],
-        [InlineKeyboardButton(_(lang, "btn_restart"), callback_data="restart_confirm")],
-        [InlineKeyboardButton(_(lang, "back"), callback_data="menu")],
-    ])
+    ]
+    # Admin-only: whitelist, access log, DB stats, restart
+    if current_uid == OWNER_ID:
+        wl_count = len(settings.get_whitelist())
+        al_count = len(settings.get_access_log())
+        kb.append([InlineKeyboardButton(_(lang, "settings_whitelist", count=wl_count), callback_data="whitelist_menu")])
+        kb.append([InlineKeyboardButton(_(lang, "btn_access_log", total=al_count), callback_data="access_log")])
+        kb.append([InlineKeyboardButton(_(lang, "db_stats_title"), callback_data="db_stats")])
+        kb.append([InlineKeyboardButton(_(lang, "btn_restart"), callback_data="restart_confirm")])
+    kb.append([InlineKeyboardButton(_(lang, "back"), callback_data="menu")])
+    return InlineKeyboardMarkup(kb)
 
 
 def whitelist_menu(lang: str):
@@ -201,6 +204,8 @@ def fmt_daily_log_for_user(lang: str, user_id: int, username: str, date_str: str
     """
     PAGE_SIZE = 5
     sessions = db.get_daily_log(user_id, date_str, tracked_by=tracked_by)
+    if isinstance(sessions, tuple):
+        sessions = sessions[0]
     total = len(sessions)
     total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
     start = page * PAGE_SIZE
@@ -508,19 +513,19 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Settings ──
     elif data == "settings":
-        await query.edit_message_text(_(lang, "settings_title"), reply_markup=settings_menu(lang))
+        await query.edit_message_text(_(lang, "settings_title"), reply_markup=settings_menu(lang, current_uid))
 
     elif data == "toggle_lang":
         new_lang = "en" if lang == "ru" else "ru"
         settings.set_lang(new_lang)
         old_msg = query.message
         lang = new_lang
-        await query.edit_message_text(_(lang, "settings_title"), reply_markup=settings_menu(lang))
+        await query.edit_message_text(_(lang, "settings_title"), reply_markup=settings_menu(lang, current_uid))
 
     elif data == "toggle_notifications":
         current = settings.get_notifications_enabled()
         settings.set_notifications_enabled(not current)
-        await query.edit_message_text(_(lang, "settings_title"), reply_markup=settings_menu(lang))
+        await query.edit_message_text(_(lang, "settings_title"), reply_markup=settings_menu(lang, current_uid))
 
     elif data == "whitelist_menu":
         kb, text = whitelist_menu(lang)
