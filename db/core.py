@@ -1,7 +1,7 @@
 """SQLite database layer for TG Online Tracker."""
 import sqlite3
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from contextlib import contextmanager
 
 DB_PATH = os.getenv("DB_PATH", os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "tracker.db"))
@@ -154,12 +154,18 @@ def is_online_now(user_id: int, tracked_by: int | None = None) -> bool:
         return conn.execute(sql + " LIMIT 1", params).fetchone() is not None
 
 
-def get_last_seen(user_id: int, tracked_by: int) -> str | None:
+def get_last_seen(user_id: int, tracked_by: int | None = None) -> str | None:
     with get_conn() as conn:
-        row = conn.execute(
-            "SELECT MAX(went_offline) as ls FROM online_sessions WHERE user_id=? AND tracked_by=? AND went_offline IS NOT NULL",
-            (user_id, tracked_by),
-        ).fetchone()
+        if tracked_by is not None:
+            row = conn.execute(
+                "SELECT MAX(went_offline) as ls FROM online_sessions WHERE user_id=? AND tracked_by=? AND went_offline IS NOT NULL",
+                (user_id, tracked_by),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT MAX(went_offline) as ls FROM online_sessions WHERE user_id=? AND went_offline IS NOT NULL",
+                (user_id,),
+            ).fetchone()
         return row["ls"] if row else None
 
 
@@ -186,8 +192,7 @@ def end_session(user_id: int, tracked_by: int):
         )
 
 
-def get_daily_log(user_id: int, date: str, page: int = 0, tracked_by: int | None = None) -> list:
-    limit, offset = 5, page * 5
+def get_daily_log(user_id: int, date: str, tracked_by: int | None = None) -> list:
     with get_conn() as conn:
         sql = (
             "SELECT * FROM online_sessions WHERE user_id=? AND date(went_online)=?"
@@ -196,15 +201,8 @@ def get_daily_log(user_id: int, date: str, page: int = 0, tracked_by: int | None
         if tracked_by is not None:
             sql += " AND tracked_by=?"
             params.append(tracked_by)
-        sql += " ORDER BY went_online DESC LIMIT ? OFFSET ?"
-        params.extend([limit, offset])
-        rows = conn.execute(sql, params).fetchall()
-        total = conn.execute(
-            "SELECT COUNT(*) FROM online_sessions WHERE user_id=? AND date(went_online)=?",
-            (user_id, date),
-        ).fetchone()[0]
-        has_more = (page + 1) * 5 < total
-        return list(rows), has_more, page
+        sql += " ORDER BY went_online DESC"
+        return list(conn.execute(sql, params).fetchall())
 
 
 def get_prev_session(user_id: int, tracked_by: int) -> dict | None:
@@ -217,15 +215,17 @@ def get_prev_session(user_id: int, tracked_by: int) -> dict | None:
 
 def get_export_data(user_id: int, days: int = 365, tracked_by: int | None = None):
     with get_conn() as conn:
+        base_sql = (
+            "SELECT u.username, u.display_name, s.went_online, s.went_offline "
+            "FROM online_sessions s "
+            "JOIN tracked_users u ON u.user_id = s.user_id "
+            "WHERE s.user_id=? AND s.went_online >= date('now', ?)"
+        )
         if tracked_by is not None:
-            return conn.execute(
-                "SELECT user_id, went_online, went_offline FROM online_sessions WHERE user_id=? AND tracked_by=? AND went_online >= date('now', ?) ORDER BY went_online",
-                (user_id, tracked_by, f"-{days} days"),
-            ).fetchall()
-        return conn.execute(
-            "SELECT user_id, went_online, went_offline FROM online_sessions WHERE user_id=? AND went_online >= date('now', ?) ORDER BY went_online",
-            (user_id, f"-{days} days"),
-        ).fetchall()
+            sql = base_sql + " AND s.tracked_by=? ORDER BY s.went_online"
+            return conn.execute(sql, (user_id, f"-{days} days", tracked_by)).fetchall()
+        sql = base_sql + " ORDER BY s.went_online"
+        return conn.execute(sql, (user_id, f"-{days} days")).fetchall()
 
 
 def get_notify_mode(user_id: int, tracked_by: int) -> str:
@@ -249,12 +249,12 @@ def is_muted(user_id: int, tracked_by: int) -> bool:
         ).fetchone()
         if not row or not row["mute_until"]:
             return False
-        return row["mute_until"] > datetime.now().isoformat()
+        return row["mute_until"] > datetime.now(timezone.utc).isoformat()
 
 
 def mute_user(user_id: int, hours: int, tracked_by: int):
     from datetime import timedelta
-    until = (datetime.now() + timedelta(hours=hours)).isoformat()
+    until = (datetime.now(timezone.utc) + timedelta(hours=hours)).isoformat()
     with get_conn() as conn:
         conn.execute(
             "UPDATE tracked_users SET mute_until=? WHERE user_id=? AND tracked_by=?",

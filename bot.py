@@ -29,7 +29,7 @@ API_ID = int(os.environ["TG_API_ID"])
 API_HASH = os.environ["TG_API_HASH"]
 PHONE = os.environ["TG_PHONE_PART1"] + os.environ["TG_PHONE_PART2"]
 SESSION = Path(__file__).parent / "tg-online.session"
-OWNER_ID = int(os.getenv("OWNER_ID", "123456789"))
+OWNER_ID = int(os.environ["OWNER_ID"])
 
 db.init_db()
 
@@ -105,7 +105,7 @@ def contacts_list(lang: str, tracked_by: int):
         return None, _(lang, "no_contacts")
     buttons = []
     for u in users:
-        label = u["display_name"] or f"@{u['username']}" if u["username"] else f"ID:{u['user_id']}"
+        label = u["display_name"] or (f"@{u['username']}" if u["username"] else f"ID:{u['user_id']}")
         buttons.append([
             InlineKeyboardButton(f"👤 {label}", callback_data=f"user_{u['user_id']}")
         ])
@@ -211,8 +211,6 @@ def fmt_daily_log_for_user(lang: str, user_id: int, username: str, date_str: str
     """
     PAGE_SIZE = 5
     sessions = db.get_daily_log(user_id, date_str, tracked_by=tracked_by)
-    if isinstance(sessions, tuple):
-        sessions = sessions[0]
     total = len(sessions)
     total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
     start = page * PAGE_SIZE
@@ -246,7 +244,7 @@ def fmt_getall(lang: str, tracked_by: int) -> str:
         if db.is_online_now(u["user_id"]):
             lines.append(_(lang, "getall_online", username=name))
         else:
-            ts = db.get_last_seen(u["user_id"])
+            ts = db.get_last_seen(u["user_id"], tracked_by)
             if ts:
                 dt = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
                 delta = datetime.utcnow() - dt
@@ -724,8 +722,7 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("mute_"):
         parts = data.split("_")
         user_id, hours = int(parts[1]), int(parts[2])
-        until = (datetime.now(timezone.utc) + timedelta(hours=hours)).isoformat()
-        db.set_mute(user_id, until)
+        db.mute_user(user_id, hours, current_uid)
         name = display(user_id)
         await query.answer(_(lang, "mute_done", username=name, hours=hours), show_alert=True)
         kb, text = user_menu_view(lang, user_id, current_uid)
@@ -733,7 +730,7 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data.startswith("unmute_"):
         user_id = int(data.split("_")[1])
-        db.set_mute(user_id, None)
+        db.unmute_user(user_id, current_uid)
         name = display(user_id)
         await query.answer(_(lang, "unmute_done", username=name), show_alert=True)
         kb, text = user_menu_view(lang, user_id, current_uid)
@@ -895,6 +892,7 @@ async def receive_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = guard(update)
     if not lang:
         return ConversationHandler.END
+    current_uid = update.effective_user.id
 
     date_str = update.message.text.strip()
     try:
@@ -959,6 +957,8 @@ def make_status_handler(bot_app):
             print(f"[{now_utc}] 🟢 user_id={user_id} (tracked by {len(trackers)}) → online")
 
             for tu in trackers:
+                if not settings.get_notifications_enabled():
+                    continue
                 user = db.get_user(user_id, tu)
                 if not user:
                     continue
@@ -987,6 +987,8 @@ def make_status_handler(bot_app):
             print(f"[{now_utc}] ⚫ user_id={user_id} (tracked by {len(trackers)}) → offline")
 
             for tu in trackers:
+                if not settings.get_notifications_enabled():
+                    continue
                 user = db.get_user(user_id, tu)
                 if not user:
                     continue
