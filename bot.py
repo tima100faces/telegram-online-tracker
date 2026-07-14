@@ -132,11 +132,14 @@ def date_picker(lang: str, user_id: int):
 
 
 def settings_menu(lang: str):
+    notif = _(lang, "notifications_on") if settings.get_notifications_enabled() else _(lang, "notifications_off")
+    wl_count = len(settings.get_whitelist())
+    al_count = len(settings.get_access_log())
     return InlineKeyboardMarkup([
         [InlineKeyboardButton(_(lang, "settings_language", lang_name="RU" if lang == "ru" else "EN"), callback_data="toggle_lang")],
-        [InlineKeyboardButton(_(lang, "settings_notifications"), callback_data="toggle_notifications")],
-        [InlineKeyboardButton(_(lang, "btn_whitelist"), callback_data="whitelist_menu")],
-        [InlineKeyboardButton(_(lang, "btn_access_log"), callback_data="access_log")],
+        [InlineKeyboardButton(_(lang, "notification_settings", state=notif), callback_data="toggle_notifications")],
+        [InlineKeyboardButton(_(lang, "settings_whitelist", count=wl_count), callback_data="whitelist_menu")],
+        [InlineKeyboardButton(_(lang, "btn_access_log", total=al_count), callback_data="access_log")],
         [InlineKeyboardButton(_(lang, "db_stats_title"), callback_data="db_stats")],
         [InlineKeyboardButton(_(lang, "btn_restart"), callback_data="restart_confirm")],
         [InlineKeyboardButton(_(lang, "back"), callback_data="menu")],
@@ -470,13 +473,12 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         row1 = ""
         row2 = ""
         for h, cnt in hourly:
-            if h % 6 == 0 and h > 0:
-                row1 += " "
-                row2 += " "
             idx = 0
             if cnt > 0:
                 idx = min(4, max(1, int(cnt / max_count * 4)))
             row1 += bar_chars[idx]
+            if h > 0:
+                row2 += " "
             row2 += f"{h:02d}"
         lines.append("")
         lines.append(_(lang, "stats_hourly"))
