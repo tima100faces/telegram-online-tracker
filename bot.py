@@ -52,7 +52,7 @@ def guard(update: Update) -> str | None:
     if uid == OWNER_ID or settings.is_whitelisted(uid):
         return settings.get_lang()
     # Open beta: auto-whitelist new users
-    if settings.is_open_beta():
+    if settings.is_open_mode():
         uname = update.effective_user.username or ""
         settings.add_whitelist(uid, uname, 0)
         return settings.get_lang()
@@ -144,8 +144,8 @@ def settings_menu(lang: str, current_uid: int = 0):
     ]
     # Admin-only
     if current_uid == OWNER_ID:
-        beta_state = "ON" if settings.is_open_beta() else "OFF"
-        kb.append([InlineKeyboardButton(_(lang, "open_beta_toggle", state=beta_state), callback_data="toggle_open_beta")])
+        beta_state = "ON" if settings.is_open_mode() else "OFF"
+        kb.append([InlineKeyboardButton(_(lang, "open_mode_toggle", state=beta_state), callback_data="toggle_open_mode")])
         wl_count = len(settings.get_whitelist())
         al_count = len(settings.get_access_log())
         kb.append([InlineKeyboardButton(_(lang, "settings_whitelist", count=wl_count), callback_data="whitelist_menu")])
@@ -326,8 +326,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await reject(update)
         return
     # Open beta onboarding — show welcome message before menu
-    if settings.is_open_beta():
-        await update.message.reply_text(_(lang, "open_beta_onboarding"))
+    if settings.is_open_mode():
+        await update.message.reply_text(_(lang, "open_mode_onboarding"))
     await update.message.reply_text(_(lang, "menu_title"), reply_markup=main_menu(lang))
 
 
@@ -603,8 +603,8 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         settings.set_notifications_enabled(not current)
         await query.edit_message_text(_(lang, "settings_title"), reply_markup=settings_menu(lang, current_uid))
 
-    elif data == "toggle_open_beta":
-        settings.set_open_beta(not settings.is_open_beta())
+    elif data == "toggle_open_mode":
+        settings.set_open_mode(not settings.is_open_mode())
         await query.edit_message_text(_(lang, "settings_title"), reply_markup=settings_menu(lang, current_uid))
 
     elif data == "whitelist_menu":
@@ -794,12 +794,12 @@ async def receive_username(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     # Open beta contact limit
-    if settings.is_open_beta():
+    if settings.is_open_mode():
         current_uid = update.effective_user.id
         count = len(db.get_active_users(current_uid))
         if count >= 10:
             await update.message.reply_text(
-                _(lang, "open_beta_limit"),
+                _(lang, "open_mode_limit"),
                 reply_markup=main_menu(lang),
             )
             return ConversationHandler.END

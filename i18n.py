@@ -124,24 +124,24 @@ TEXTS = {
         "stats_no_data": "Нет данных для статистики.",
         "stats_select": "Выбери пользователя:",
         # Open beta
-        "open_beta_toggle": "🌍 Open Beta: {state}",
-        "open_beta_onboarding": (
-            "🧪 <b>Открытый бета-режим</b>\n\n"
+        "open_mode_toggle": "🌍 Open Mode: {state}",
+        "open_mode_onboarding": (
+            "🧪 <b>Открытый режим</b>\n\n"
             "Добро пожаловать! Бот открыт для тестирования.\n"
             "⏱ Максимум 10 контактов на пользователя.\n"
             "⚠️ Данные могут быть сброшены. Будем рады фидбеку!"
         ),
-        "open_beta_limit": "⚠️ <b>Лимит — макс 10 контактов в открытой бете.</b>\nУдали кого-нибудь или дождись полного релиза.",
+        "open_mode_limit": "⚠️ <b>Лимит — макс 10 контактов в открытом режиме.</b>\nУдали кого-нибудь или дождись полного релиза.",
     },
         # Open beta
-        "open_beta_toggle": "🌍 Open Beta: {state}",
-        "open_beta_onboarding": (
-            "🧪 <b>Открытый бета-режим</b>\n\n"
+        "open_mode_toggle": "🌍 Open Mode: {state}",
+        "open_mode_onboarding": (
+            "🧪 <b>Открытый режим</b>\n\n"
             "Добро пожаловать! Бот открыт для тестирования.\n"
             "⏱ Максимум 10 контактов на пользователя.\n"
             "⚠️ Данные могут быть сброшены. Будем рады фидбеку!"
         ),
-        "open_beta_limit": "⚠️ <b>Лимит — макс 10 контактов в открытой бете.</b>\nУдали кого-нибудь или дождись полного релиза.",
+        "open_mode_limit": "⚠️ <b>Лимит — макс 10 контактов в открытом режиме.</b>\nУдали кого-нибудь или дождись полного релиза.",
     "en": {
         "menu_title": "📡 TG Online Tracker",
         "contacts_title": "📋 My Contacts",
@@ -265,24 +265,24 @@ TEXTS = {
         "stats_no_data": "No stats data yet.",
         "stats_select": "Pick a user:",
         # Open beta
-        "open_beta_toggle": "🌍 Open Beta: {state}",
-        "open_beta_onboarding": (
-            "🧪 <b>Open Beta Mode</b>\n\n"
+        "open_mode_toggle": "🌍 Open Mode: {state}",
+        "open_mode_onboarding": (
+            "🧪 <b>Open Mode Mode</b>\n\n"
             "Welcome! The bot is open for testing — no whitelist required.\n"
             "⏱ Max 10 contacts per user.\n"
             "⚠️ Data may be reset. Feedback welcome!"
         ),
-        "open_beta_limit": "⚠️ <b>Limit reached — max 10 contacts in open beta.</b>\nRemove someone first or wait for full release.",
+        "open_mode_limit": "⚠️ <b>Limit reached — max 10 contacts in open mode.</b>\nRemove someone first or wait for full release.",
     },
         # Open beta
-        "open_beta_toggle": "🌍 Open Beta: {state}",
-        "open_beta_onboarding": (
-            "🧪 <b>Open Beta Mode</b>\n\n"
+        "open_mode_toggle": "🌍 Open Mode: {state}",
+        "open_mode_onboarding": (
+            "🧪 <b>Open Mode Mode</b>\n\n"
             "Welcome! The bot is open for testing — no whitelist required.\n"
             "⏱ Max 10 contacts per user.\n"
             "⚠️ Data may be reset. Feedback welcome!"
         ),
-        "open_beta_limit": "⚠️ <b>Limit reached — max 10 contacts in open beta.</b>\nRemove someone first or wait for full release.",
+        "open_mode_limit": "⚠️ <b>Limit reached — max 10 contacts in open mode.</b>\nRemove someone first or wait for full release.",
 }
 
 RUDE_MESSAGES_RU = [
