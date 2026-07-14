@@ -49,6 +49,17 @@ def set_notifications_enabled(enabled: bool):
     set_setting("notifications", "1" if enabled else "0")
 
 
+# ── Open Beta mode ────────────────────────────────────────────────────
+
+
+def is_open_beta() -> bool:
+    return get_setting("open_beta", "0") == "1"
+
+
+def set_open_beta(enabled: bool):
+    set_setting("open_beta", "1" if enabled else "0")
+
+
 # ── Whitelist ─────────────────────────────────────────────────────────
 
 

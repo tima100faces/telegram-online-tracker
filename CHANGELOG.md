@@ -2,6 +2,16 @@
 
 All notable changes to Telegram Online Tracker.
 
+## [v7] — 2026-07-14
+
+### Added
+- **Open Beta mode** — toggle in Settings (admin only). When ON:
+  - Whitelist bypassed — anyone can `/start` the bot
+  - New users auto-whitelisted on first interaction
+  - Max 10 contacts per user
+  - Onboarding welcome message on `/start`
+  - "Open Beta: ON/OFF" button in admin settings
+
 ## [v6] — 2026-07-14
 
 ### Added
