@@ -16,6 +16,14 @@ All notable changes to Telegram Online Tracker.
 - `get_active_users()` — polymorphic: with arg = filtered, without = all
 - Helper functions (`contacts_list`, `user_picker`, etc.) pass through tracked_by
 
+### Fixed in v6
+- `fmt_daily_log_for_user` TypeError — `get_daily_log` returns 3-value pagination tuple, caller didn't unpack
+- `receive_username` — `add_user` missing `tracked_by=effective_user.id`
+- `notifymode_` handler — `get/set_notify_mode` missing `current_uid`
+- `receive_rename` — called non-existent `set_display_name`, now uses `rename_user(user_id, name, current_uid)`
+- Stats no-data alert replaced with persistent message (popup was invisible)
+- Admin buttons hidden from non-owner settings menu
+
 ## [v5] — 2026-07-14
 
 ### Added

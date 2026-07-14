@@ -2,31 +2,30 @@
 
 ## Overview
 
-TG Online Tracker runs as a single process combining two asyncio components:
+TG Online Tracker runs as a single process combining three asyncio components:
 
 ```
-┌─────────────────────────────────────────────┐
-│              Telegram Servers               │
-│    ┌──────────┐          ┌──────────┐       │
-│    │  MTProto │          │  Bot API │       │
-│    └────┬─────┘          └────┬─────┘       │
-└─────────┼─────────────────────┼─────────────┘
+┌─────────────────────────────────────────────────────┐
+│                  Telegram Servers                   │
+│    ┌──────────┐          ┌──────────┐              │
+│    │  MTProto │          │  Bot API │              │
+│    └────┬─────┘          └────┬─────┘              │
+└─────────┼─────────────────────┼────────────────────┘
           │                     │
-    ┌─────▼─────────────────────▼─────────────┐
-    │           bot.py (single process)        │
-    │  ┌──────────────┐  ┌───────────────┐    │
-    │  │   Telethon    │  │ python-tg-bot │    │
-    │  │   (events)    │  │   (inlines)   │    │
-    │  └──────┬────────┘  └───────┬───────┘    │
-    │         │                   │            │
-    │         ▼                   ▼            │
-    │  ┌──────────────────────────────────┐    │
-    │  │            SQLite (WAL)          │    │
-    │  │  ┌────────────┐ ┌─────────────┐  │    │
-    │  │  │  sessions   │ │  settings   │  │    │
-    │  │  └────────────┘ └─────────────┘  │    │
-    │  └──────────────────────────────────┘    │
-    └──────────────────────────────────────────┘
+    ┌─────▼─────────────────────▼────────────────────┐
+    │           bot.py (single process)               │
+    │  ┌──────────┐  ┌───────────┐  ┌──────────────┐ │
+    │  │ Telethon  │  │ ptb Bot   │  │ REST API     │ │
+    │  │ (events)  │  │ (inlines) │  │ (stdlib)     │ │
+    │  └─────┬─────┘  └─────┬─────┘  └──────┬───────┘ │
+    │        │              │               │         │
+    │        ▼              ▼               ▼         │
+    │  ┌──────────────────────────────────────────┐   │
+    │  │            SQLite (WAL)                  │   │
+    │  │  tracked_users  online_sessions  settings│   │
+    │  │  whitelist      access_log                │   │
+    │  └──────────────────────────────────────────┘   │
+    └────────────────────────────────────────────────┘
 ```
 
 ## Components
@@ -35,39 +34,57 @@ TG Online Tracker runs as a single process combining two asyncio components:
 
 - Connects to MTProto with user account session
 - Listens for `events.UserUpdate` (push, not polling)
-- On `UserStatusOnline`: writes `start_session` to DB, sends notification
-- On `UserStatusOffline`: writes `end_session` with exact `was_online` timestamp, sends notification
+- On `UserStatusOnline`: iterates all tracking users, writes `start_session(user_id, tracked_by)` per tracker
+- On `UserStatusOffline`: closes sessions per tracker, sends notifications with session duration
+- **Multi-user aware:** one event → N sessions (one per tracking bot user)
 
 ### 2. Telegram Bot (python-telegram-bot)
 
-- Inline keyboard interface
-- Handlers: `/start`, callback queries, conversation states
-- Whitelist guard on every interaction
+- Inline keyboard interface with conversation handlers
+- Handlers: `/start`, callback queries, rename/add/date input
+- `guard(update)` on every interaction — whitelist + owner check
+- All DB calls parameterized with `tracked_by = effective_user.id`
+- Admin-only UI elements (whitelist, access log, DB stats, restart) hidden for non-owners
 
-### 3. Database (SQLite, WAL mode)
+### 3. REST API (stdlib `http.server`)
+
+- Runs on `127.0.0.1:8091`
+- Auth: Bearer token or `?token=` query param
+- Endpoints: `/health`, `/getall`, `/stats`, `/daily/<date>`
+- Zero external dependencies
+
+### 4. Database (SQLite, WAL mode)
 
 **Tables:**
 
-`tracked_users` — users being monitored:
+`tracked_users` — contacts being monitored:
 - `user_id` (PK), `username`, `first_name`, `added_at`, `active`
+- `display_name` — custom alias set via Rename
+- `notify_mode` — `online` / `offline` / `both` / `none`
+- `mute_until` — timestamp, auto-expires
+- `tracked_by` — which bot user added this contact (v6 multi-user)
 
 `online_sessions` — detected online periods:
-- `user_id` → `tracked_users`, `went_online`, `went_offline` (nullable if still online)
+- `id` (PK), `user_id`, `went_online`, `went_offline` (nullable if still online)
+- `tracked_by` — which bot user's tracking generated this session
 
-`settings` — key-value config:
+`settings` — global key-value config:
 - `key` (PK), `value` — stores `lang`, `notifications`
 
 `whitelist` — authorized bot users:
 - `user_id` (PK), `username`, `added_by`, `added_at`
 
-### 4. i18n
+`access_log` — unauthorized attempt tracking:
+- `user_id` (PK), `username`, `first_name`, `attempt_count`, `last_attempt`, `blocked`
 
-`i18n.py` contains two dictionaries (`ru`, `en`) with all UI strings, plus rude rejection message pools (13 messages each language). Language is per-whitelist-user, stored in `settings` table.
+### 5. i18n
+
+`i18n.py` contains dictionaries (`ru`, `en`) with 100+ UI strings, plus 13 rude rejection messages per language. Language is global (stored in `settings` table), not per-user yet.
 
 ## Data Flow
 
 ```
-User opens Telegram
+User comes online
         │
         ▼
 Telegram pushes UpdateUserStatus
@@ -75,14 +92,34 @@ Telegram pushes UpdateUserStatus
         ▼
 Telethon catches event
         │
-        ├──► db.start_session(user_id, timestamp)
+        ├──► Get all trackers: SELECT tracked_by FROM tracked_users WHERE user_id=?
         │
-        └──► bot.send_message(whitelist_users, notification)
+        ├──► For each tracker: start_session(user_id, tracked_by)
+        │
+        └──► For each tracker: send notification if mode matches + not muted
+```
+
+## Multi-User Isolation (v6)
+
+```
+Bot user A (whitelisted)            Bot user B (whitelisted)
+    │                                      │
+    ├─ Adds @friend1                       ├─ Adds @friend2
+    │  (tracked_by=A)                       │  (tracked_by=B)
+    │                                      │
+    ├─ Sees: @friend1 only                ├─ Sees: @friend2 only
+    ├─ Gets: @friend1 notifications       ├─ Gets: @friend2 notifications
+    └─ Stats: @friend1 data only          └─ Stats: @friend2 data only
+
+Telethon (owner's account) tracks ALL contacts
+Sessions stored per tracked_by
+Notifications routed to tracking user
 ```
 
 ## Security
 
-- Every handler calls `guard(update)` — checks `effective_user.id` against whitelist
-- Owner ID always bypasses whitelist
-- Unauthorized users get a random rude message and no functionality
+- Every handler calls `guard(update)` — checks `effective_user.id` against whitelist + OWNER_ID
+- Owner always bypasses, gets admin UI
+- Unauthorized users get random rude message, logged, auto-blocked after 5 attempts
 - Bot token and MTProto credentials in `.env` (not committed)
+- API bound to localhost only, requires token auth

@@ -32,6 +32,7 @@ I built it because I wanted to track online patterns of people I care about with
 ## What it does
 
 - 🟢 **Catches exact online/offline timestamps** via MTProto `UpdateUserStatus` events
+- 👥 **Multi-user isolation** — each whitelisted user has their own workspace: only their contacts, stats, and notifications
 - 🔔 **Per-user notification modes** — online only, offline only, both, or mute (1/4/24h)
 - 🏷️ **Display names** — custom aliases for contacts instead of @usernames
 - 📊 **Statistics** — overall + per-user: total time, avg session, streak, hourly activity heatmap
