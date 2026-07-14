@@ -7,4 +7,5 @@ from .core import (
     set_notify_mode, get_notify_mode,
     set_mute, is_muted,
     get_prev_session, get_export_data,
+    get_db_stats, cleanup_old_sessions, vacuum_db,
 )

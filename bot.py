@@ -131,16 +131,13 @@ def date_picker(lang: str, user_id: int):
 
 
 def settings_menu(lang: str):
-    notif = _(lang, "notifications_on") if settings.get_notifications_enabled() else _(lang, "notifications_off")
-    whitelist_count = len(settings.get_whitelist())
-    access_log = settings.get_access_log()
-    log_total = len(access_log)
-    blocked = sum(1 for a in access_log if a["blocked"])
     return InlineKeyboardMarkup([
         [InlineKeyboardButton(_(lang, "settings_language", lang_name="RU" if lang == "ru" else "EN"), callback_data="toggle_lang")],
-        [InlineKeyboardButton(_(lang, "notification_settings", state=notif), callback_data="toggle_notifications")],
-        [InlineKeyboardButton(_(lang, "settings_whitelist", count=whitelist_count), callback_data="whitelist_menu")],
-        [InlineKeyboardButton(_(lang, "btn_access_log", total=log_total), callback_data="access_log")],
+        [InlineKeyboardButton(_(lang, "settings_notifications"), callback_data="toggle_notifications")],
+        [InlineKeyboardButton(_(lang, "btn_whitelist"), callback_data="whitelist_menu")],
+        [InlineKeyboardButton(_(lang, "btn_access_log"), callback_data="access_log")],
+        [InlineKeyboardButton(_(lang, "db_stats_title"), callback_data="db_stats")],
+        [InlineKeyboardButton(_(lang, "btn_restart"), callback_data="restart_confirm")],
         [InlineKeyboardButton(_(lang, "back"), callback_data="menu")],
     ])
 
@@ -488,6 +485,50 @@ async def _menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]),
         )
 
+    # ── v4: DB stats + restart ───────────────────────────────────
+    elif data == "db_stats":
+        s = db.get_db_stats()
+        text = _(lang, "db_stats", size=s["size_mb"], sessions=s["sessions"], users=s["users"])
+        await query.edit_message_text(
+            text,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton(_(lang, "btn_cleanup"), callback_data="cleanup_db")],
+                [InlineKeyboardButton(_(lang, "back"), callback_data="settings")],
+            ]),
+        )
+
+    elif data == "cleanup_db":
+        deleted = db.cleanup_old_sessions(90)
+        db.vacuum_db()
+        if deleted:
+            await query.answer(_(lang, "cleanup_done", count=deleted), show_alert=True)
+        else:
+            await query.answer(_(lang, "cleanup_none"), show_alert=True)
+        s = db.get_db_stats()
+        text = _(lang, "db_stats", size=s["size_mb"], sessions=s["sessions"], users=s["users"])
+        await query.edit_message_text(
+            text,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton(_(lang, "back"), callback_data="settings")]
+            ]),
+        )
+
+    elif data == "restart_confirm":
+        await query.edit_message_text(
+            _(lang, "restart_confirm"),
+            reply_markup=InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("✅ Yes, restart", callback_data="do_restart"),
+                    InlineKeyboardButton(_(lang, "cancel"), callback_data="settings"),
+                ]
+            ]),
+        )
+
+    elif data == "do_restart":
+        await query.edit_message_text(_(lang, "restarting"))
+        import os as _os
+        _os.system("systemctl restart tg-online-tracker &")
+
     # ── v3: User submenu ──────────────────────────────────────────
     elif data.startswith("user_"):
         user_id = int(data.split("_")[1])
@@ -817,6 +858,7 @@ async def main():
         "^(menu|contacts|lastseen|fulllog|getall|settings"
         "|toggle_lang|toggle_notifications|whitelist_menu|noop"
         "|access_log|clearlog"
+        "|db_stats|cleanup_db|restart_confirm|do_restart"
         "|remove_\\d+|ls_\\d+|log_\\d+|log_\\d+_\\S+|date_\\d+_\\S+|wldel_\\d+|unblock_\\d+"
         "|user_\\d+|notifymode_\\d+|rename_\\d+|mute_\\d+_\\d+|unmute_\\d+|export_\\d+)$"
     )

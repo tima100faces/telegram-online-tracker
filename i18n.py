@@ -101,6 +101,14 @@ TEXTS = {
         "export_empty": "Нет данных для экспорта.",
         # Quick actions
         "btn_log_today": "📊 Сегодня",
+        "db_stats_title": "📦 Database",
+        "db_stats": "📁 {size} MB | 📋 {sessions} sessions | 👥 {users} users",
+        "btn_cleanup": "🗑 Clean old (>90d)",
+        "cleanup_done": "✅ Deleted {count} old sessions.",
+        "cleanup_none": "✨ Nothing to clean.",
+        "btn_restart": "🔄 Restart Bot",
+        "restart_confirm": "⚠️ Бот перезапустится через ~1 минуту. Продолжить?",
+        "restarting": "🔄 Перезапуск... Бот вернётся через ~1 мин.",
     },
     "en": {
         "menu_title": "📡 TG Online Tracker",
@@ -202,6 +210,14 @@ TEXTS = {
         "export_empty": "No data to export.",
         # Quick actions
         "btn_log_today": "📊 Today",
+        "db_stats_title": "📦 Database",
+        "db_stats": "📁 {size} MB | 📋 {sessions} sessions | 👥 {users} users",
+        "btn_cleanup": "🗑 Clean old (>90d)",
+        "cleanup_done": "✅ Deleted {count} old sessions.",
+        "cleanup_none": "✨ Nothing to clean.",
+        "btn_restart": "🔄 Restart Bot",
+        "restart_confirm": "⚠️ Bot will restart in ~1 minute. Continue?",
+        "restarting": "🔄 Restarting... Back in ~1 min.",
     },
 }
 

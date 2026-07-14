@@ -40,6 +40,10 @@ def init_db():
                 conn.execute(f"ALTER TABLE tracked_users ADD COLUMN {col} {typ}")
             except sqlite3.OperationalError:
                 pass
+        # Auto-cleanup: keep only last 90 days of sessions
+        conn.execute(
+            "DELETE FROM online_sessions WHERE date(went_online) < date('now', '-90 days')"
+        )
 
 
 @contextmanager
@@ -233,3 +237,33 @@ def get_export_data(user_id: int = None, days: int = 365):
             " ORDER BY s.went_online",
             (f"-{days} days",),
         ).fetchall()
+
+
+def get_db_stats():
+    """Return {size_bytes, sessions, users, whitelist, access_log}."""
+    size = os.path.getsize(DB_PATH) if os.path.exists(DB_PATH) else 0
+    with get_conn() as conn:
+        sessions = conn.execute("SELECT COUNT(*) FROM online_sessions").fetchone()[0]
+        users_count = conn.execute("SELECT COUNT(*) FROM tracked_users WHERE active=1").fetchone()[0]
+        return {
+            "size_bytes": size,
+            "size_mb": round(size / 1024 / 1024, 2),
+            "sessions": sessions,
+            "users": users_count,
+        }
+
+
+def cleanup_old_sessions(keep_days: int = 90) -> int:
+    """Delete sessions older than keep_days. Returns deleted count."""
+    with get_conn() as conn:
+        before = conn.execute("SELECT COUNT(*) FROM online_sessions").fetchone()[0]
+        conn.execute("DELETE FROM online_sessions WHERE date(went_online) < date('now', ?)",
+                     (f"-{keep_days} days",))
+        after = conn.execute("SELECT COUNT(*) FROM online_sessions").fetchone()[0]
+        return before - after
+
+
+def vacuum_db():
+    """Compact the database file."""
+    with get_conn() as conn:
+        conn.execute("VACUUM")

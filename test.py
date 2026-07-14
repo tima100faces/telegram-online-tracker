@@ -75,6 +75,7 @@ pattern = re.compile(
     r"^(menu|contacts|lastseen|fulllog|getall|settings"
     r"|toggle_lang|toggle_notifications|whitelist_menu|noop"
     r"|access_log|clearlog"
+    r"|db_stats|cleanup_db|restart_confirm|do_restart"
     r"|remove_\d+|ls_\d+|log_\d+|log_\d+_\S+|date_\d+_\S+|wldel_\d+|unblock_\d+"
     r"|user_\d+|notifymode_\d+|rename_\d+|mute_\d+_\d+|unmute_\d+|export_\d+)$"
 )
@@ -84,7 +85,8 @@ valid = [
     "access_log", "clearlog",
     "remove_123", "ls_123", "log_123", "log_123_2026-07-14", "log_123_2026-07-14_2",
     "date_123_2026-07-14", "date_123_2026-07-14", "wldel_123", "unblock_123",
-    "user_123", "notifymode_123", "rename_123", "mute_123_1", "unmute_123", "export_123"
+    "user_123", "notifymode_123", "rename_123", "mute_123_1", "unmute_123", "export_123",
+    "db_stats", "cleanup_db", "restart_confirm", "do_restart",
 ]
 invalid = ["add", "wladd", "datepick_123", "ls_", "x", ""]
 for cb in valid:
@@ -115,8 +117,9 @@ v3_keys = [
     "notify_online", "notify_offline", "notify_both", "notify_none",
     "rename_prompt", "rename_done", "rename_cleared",
     "back_to_user", "mute_1h", "mute_4h", "mute_24h", "mute_done", "unmute_done",
-    "btn_more", "log_page_indicator", "export_sent", "export_empty",
-]
+    "btn_more", "log_page_indicator", "export_sent", "export_empty", "db_stats_title", "db_stats", "btn_cleanup",
+ "cleanup_done", "cleanup_none", "btn_restart", "restart_confirm", "restarting",
+ ]
 for lang in ["en", "ru"]:
     for key in v3_keys:
         val = _(lang, key)
