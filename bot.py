@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""TG Online Tracker v2 — daemon + bot with settings, whitelist, i18n, notifications."""
+"""TG Online Tracker — single-process bot: Telethon listener + Telegram bot with settings, whitelist, i18n, notifications."""
 import asyncio
 import os
-import random
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -126,8 +125,8 @@ def user_picker(lang: str, prefix: str, tracked_by: int):
 
 
 def date_picker(lang: str, user_id: int):
-    today = datetime.utcnow().strftime("%Y-%m-%d")
-    yesterday = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
     return InlineKeyboardMarkup([
         [InlineKeyboardButton(_(lang, "date_today"), callback_data=f"date_{user_id}_{today}")],
         [InlineKeyboardButton(_(lang, "date_yesterday"), callback_data=f"date_{user_id}_{yesterday}")],
@@ -190,7 +189,7 @@ def fmt_last_seen(lang: str, username: str, ts: str | None) -> str:
     if ts is None:
         return _(lang, "no_data", username=username)
     dt = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
-    delta = datetime.utcnow() - dt
+    delta = datetime.now(timezone.utc).replace(tzinfo=None) - dt
     if delta.days >= 365:
         return _(lang, "last_seen_years", username=username, n=delta.days // 365, date=dt.strftime("%d.%m.%Y"))
     elif delta.days >= 30:
@@ -247,7 +246,7 @@ def fmt_getall(lang: str, tracked_by: int) -> str:
             ts = db.get_last_seen(u["user_id"], tracked_by)
             if ts:
                 dt = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
-                delta = datetime.utcnow() - dt
+                delta = datetime.now(timezone.utc).replace(tzinfo=None) - dt
                 if delta.days > 0:
                     when = f"{delta.days}d ago"
                 elif delta.seconds >= 3600:
@@ -980,9 +979,8 @@ def make_status_handler(bot_app):
                     text = f"🟢 {name} online{ctx}"
                     try:
                         await bot_app.bot.send_message(tu, text)
-                    except Exception:
-                        pass
-
+                    except Exception as e:
+                        print(f"[notify] failed to send to {tu}: {e}")
         elif isinstance(status, UserStatusOffline):
             for tu in trackers:
                 db.end_session(user_id, tu)
@@ -1012,9 +1010,8 @@ def make_status_handler(bot_app):
                     text = f"⚫ {name} offline{ctx}"
                     try:
                         await bot_app.bot.send_message(tu, text)
-                    except Exception:
-                        pass
-
+                    except Exception as e:
+                        print(f"[notify] failed to send to {tu}: {e}")
     return on_status
 
 
