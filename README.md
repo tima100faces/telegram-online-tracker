@@ -1,7 +1,7 @@
 # Telegram Online Tracker
 
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue)](https://www.python.org/)
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![Telegram Bot](https://img.shields.io/badge/Telegram-Bot-2CA5E0)](https://core.telegram.org/bots)
 
 > A privacy-respecting Telegram bot for tracking when your friends and contacts come online and go offline — with exact timestamps, not vague "last seen recently" guesses.
@@ -174,7 +174,7 @@ They get one of 13 randomly-selected rude English phrases (stuff like "Private p
 
 ## License
 
-MIT — do whatever you want, just don't sue me.
+[GNU General Public License v3.0](LICENSE) — free software, copyleft. Use it, modify it, share it — just keep it open.
 
 ---
 
