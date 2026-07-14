@@ -123,6 +123,15 @@ TEXTS = {
         "stats_hourly": "Активность по часам (7 дн.):",
         "stats_no_data": "Нет данных для статистики.",
         "stats_select": "Выбери пользователя:",
+        # Open beta
+        "open_beta_toggle": "🌍 Open Beta: {state}",
+        "open_beta_onboarding": (
+            "🧪 <b>Открытый бета-режим</b>\n\n"
+            "Добро пожаловать! Бот открыт для тестирования.\n"
+            "⏱ Максимум 10 контактов на пользователя.\n"
+            "⚠️ Данные могут быть сброшены. Будем рады фидбеку!"
+        ),
+        "open_beta_limit": "⚠️ <b>Лимит — макс 10 контактов в открытой бете.</b>\nУдали кого-нибудь или дождись полного релиза.",
     },
         # Open beta
         "open_beta_toggle": "🌍 Open Beta: {state}",
@@ -255,6 +264,15 @@ TEXTS = {
         "stats_hourly": "Hourly activity (7d):",
         "stats_no_data": "No stats data yet.",
         "stats_select": "Pick a user:",
+        # Open beta
+        "open_beta_toggle": "🌍 Open Beta: {state}",
+        "open_beta_onboarding": (
+            "🧪 <b>Open Beta Mode</b>\n\n"
+            "Welcome! The bot is open for testing — no whitelist required.\n"
+            "⏱ Max 10 contacts per user.\n"
+            "⚠️ Data may be reset. Feedback welcome!"
+        ),
+        "open_beta_limit": "⚠️ <b>Limit reached — max 10 contacts in open beta.</b>\nRemove someone first or wait for full release.",
     },
         # Open beta
         "open_beta_toggle": "🌍 Open Beta: {state}",
